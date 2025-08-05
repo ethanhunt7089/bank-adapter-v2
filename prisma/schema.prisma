@@ -1,0 +1,48 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Tokens (รวมข้อมูล client และ token)
+model Token {
+  id          Int      @id @default(autoincrement())
+  clientId    String   @unique @map("client_id")
+  clientSecret String  @map("client_secret")
+  description String?
+  targetDomain String  @map("target_domain")
+  prefix      String   @default("") // เพิ่ม default value
+  tokenHash   String?  @unique @map("token_hash")
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  apiLogs  ApiLog[]
+
+  @@map("tokens")
+}
+
+// API Logs
+model ApiLog {
+  id          Int      @id @default(autoincrement())
+  clientId    String   @map("client_id")
+  targetDomain String  @map("target_domain")
+  endpoint    String
+  method      String
+  requestData Json?    @map("request_data")
+  responseData Json?   @map("response_data")
+  statusCode  Int?     @map("status_code")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  // Relations
+  token Token @relation(fields: [clientId], references: [clientId])
+
+  @@map("api_logs")
+}
