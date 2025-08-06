@@ -1,11 +1,9 @@
-import { Body, Controller, HttpCode, HttpStatus, Post } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Post, Request } from '@nestjs/common';
 import {
-    AuthService,
-    CreateClientDto,
-    CreateTokenDto,
-    RevokeTokenDto,
-    SetupDto,
-    ValidateTokenDto,
+  AuthService,
+  RevokeTokenDto,
+  SetupDto,
+  ValidateTokenDto,
 } from './auth.service';
 
 @Controller('auth')
@@ -18,17 +16,9 @@ export class AuthController {
     return this.authService.setup(setupDto);
   }
 
-  @Post('client')
-  @HttpCode(HttpStatus.CREATED)
-  async createClient(@Body() createClientDto: CreateClientDto) {
-    return this.authService.createClient(createClientDto);
-  }
 
-  @Post('token')
-  @HttpCode(HttpStatus.OK)
-  async createToken(@Body() createTokenDto: CreateTokenDto) {
-    return this.authService.createToken(createTokenDto);
-  }
+
+
 
   @Post('validate')
   @HttpCode(HttpStatus.OK)
@@ -40,5 +30,17 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   async revokeToken(@Body() revokeTokenDto: RevokeTokenDto) {
     return this.authService.revokeToken(revokeTokenDto);
+  }
+
+  @Get('verify')
+  @HttpCode(HttpStatus.OK)
+  async verifyToken(@Request() req: any) {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return { success: false, error: 'Missing or invalid Authorization header' };
+    }
+
+    const token = authHeader.substring(7);
+    return this.authService.validateToken({ token });
   }
 }

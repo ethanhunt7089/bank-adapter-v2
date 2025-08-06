@@ -5,10 +5,9 @@ import { prisma } from '../lib/prisma';
 
 export interface JwtPayload {
   sub: string;
-  domain: string;
-  prefix: string;
+  target_domain: string;
   iat: number;
-  exp: number | null;
+  exp?: number; // optional เพราะเราไม่ใส่
 }
 
 @Injectable()
@@ -22,12 +21,12 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   async validate(payload: JwtPayload) {
-    const { sub: clientId } = payload;
+    const { sub: targetDomain } = payload;
 
     // ตรวจสอบใน database
     const tokenRecord = await prisma.token.findFirst({
       where: {
-        clientId,
+        targetDomain,
         isActive: true,
       },
     });
@@ -37,9 +36,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     }
 
     return {
-      clientId: payload.sub,
-      domain: payload.domain,
-      prefix: payload.prefix,
+      target_domain: payload.sub,
     };
   }
 }
