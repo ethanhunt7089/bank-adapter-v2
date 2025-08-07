@@ -50,11 +50,12 @@ export class WithdrawController {
           "data": {
             "success": true,
             "txnId": "clx1234567890",
-            "message": "รายการถอนเงินถูกส่งไปยังระบบเรียบร้อยแล้ว",
-            "status": "PENDING",
+            "message": "ถอนเงินสำเร็จ",
+            "status": "SUCCESS",
             "amount": 50000,
             "currency": "LAK",
-            "transferDateTimeV2": "2025-08-06T10:30:00.000Z"
+            "transferDateTimeV2": "2025-08-06T10:30:00.000Z",
+            "fromBankAccountNumber": "110-12-00-1234567-001"
           }
         }
       }

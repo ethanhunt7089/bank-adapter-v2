@@ -1,13 +1,8 @@
 import { HttpException, Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 
-interface WithdrawRequest {
-  accountNumber: string;
-  amount: number;
-}
-
 @Injectable()
-export class WithdrawService {
+export class BankAccountService {
   constructor(
     private readonly jwtService: JwtService
   ) {}
@@ -23,7 +18,7 @@ export class WithdrawService {
     }
   }
 
-  async processWithdraw(withdrawRequest: WithdrawRequest, token: string) {
+  async getBankAccounts(token: string) {
     try {
       // ตรวจสอบ token และดึง target_domain
       const payload = this.jwtService.verify(token);
@@ -33,21 +28,19 @@ export class WithdrawService {
         throw new HttpException('Invalid token: missing target_domain', 401);
       }
 
-      // เรียก backend withdraw API
-      const fullUrl = `${backendUrl}/api/withdraw`;
+      // เรียก backend bank-account API
+      const fullUrl = `${backendUrl}/api/bank-account`;
       
       console.log('🌐 Backend URL from token:', backendUrl);
       console.log('🔗 Full URL:', fullUrl);
       console.log('🔑 Using token:', token);
-      console.log('💰 Withdraw request:', withdrawRequest);
       
       const response = await fetch(fullUrl, {
-        method: 'POST',
+        method: 'GET',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(withdrawRequest)
+        }
       });
 
       if (!response.ok) {
@@ -76,11 +69,10 @@ export class WithdrawService {
       }
       
       // บันทึก log (console.log แทน database)
-      console.log('Withdraw Log:', {
+      console.log('Bank Accounts Log:', {
         targetDomain: backendUrl,
-        endpoint: '/api/withdraw',
-        method: 'POST',
-        requestBody: JSON.stringify(withdrawRequest),
+        endpoint: '/api/bank-account',
+        method: 'GET',
         responseBody: JSON.stringify(result),
         statusCode: response.status,
         isSuccess: response.ok
@@ -88,7 +80,7 @@ export class WithdrawService {
 
       return result;
     } catch (error) {
-      console.error('Process withdraw error:', error);
+      console.error('Process bank accounts error:', error);
       console.error('Error details:', {
         message: error.message,
         code: error.code,
@@ -96,11 +88,10 @@ export class WithdrawService {
       });
       
       // บันทึก error log (console.log แทน database)
-      console.log('Withdraw Error Log:', {
+      console.log('Bank Accounts Error Log:', {
         targetDomain: 'unknown',
-        endpoint: '/api/withdraw',
-        method: 'POST',
-        requestBody: JSON.stringify(withdrawRequest),
+        endpoint: '/api/bank-account',
+        method: 'GET',
         responseBody: JSON.stringify({ error: error.message }),
         statusCode: error.status || 500,
         isSuccess: false
