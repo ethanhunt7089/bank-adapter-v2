@@ -30,6 +30,26 @@ export class TransactionsController {
       }
     }
   })
+  @ApiQuery({ 
+    name: 'bankCode', 
+    required: false, 
+    description: 'Filter by bank code - กรองตามรหัสธนาคาร (Bank code filter)', 
+    enum: ['BCEL', 'JDB', 'LDB', 'LVB', 'ACLB', 'APB', 'BIC', 'BOC', 'ICBC', 'IDCB', 'MRB', 'MBB', 'PBB', 'SCB', 'STB', 'VTB', 'BFL'],
+    examples: {
+      bcel: {
+        value: 'BCEL',
+        description: 'BCEL BANK'
+      },
+      scb: {
+        value: 'SCB', 
+        description: 'SACOMBANK LAO'
+      },
+      ldb: {
+        value: 'LDB',
+        description: 'LAO DEVELOPMENT BANK'
+      }
+    }
+  })
   @ApiResponse({ 
     status: 200, 
     description: 'Transactions retrieved successfully',
@@ -94,7 +114,8 @@ export class TransactionsController {
     @Request() req: any,
     @Query('fromBankAccountNumber') fromBankAccountNumber?: string,
     @Query('fromName') fromName?: string,
-    @Query('fromDate') fromDate?: string
+    @Query('fromDate') fromDate?: string,
+    @Query('bankCode') bankCode?: string
   ) {
     try {
       // ตรวจสอบ token
@@ -113,7 +134,15 @@ export class TransactionsController {
         throw new HttpException('Invalid token', HttpStatus.UNAUTHORIZED);
       }
 
-      // เรียก backend API
+      // Log parameters (bankCode ยังไม่ส่งไป backend)
+      console.log('📊 Transaction parameters:', {
+        fromBankAccountNumber,
+        fromName, 
+        fromDate,
+        bankCode: bankCode || '(not specified)'
+      });
+
+      // เรียก backend API (ยังไม่ส่ง bankCode)
       const result = await this.transactionsService.processGetTransactions({
         fromBankAccountNumber,
         fromName,
