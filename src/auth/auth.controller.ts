@@ -1,4 +1,5 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Post, Request } from '@nestjs/common';
+import { ApiExcludeController } from '@nestjs/swagger';
 import {
   AuthService,
   RevokeTokenDto,
@@ -6,6 +7,7 @@ import {
   ValidateTokenDto,
 } from './auth.service';
 
+@ApiExcludeController()
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
