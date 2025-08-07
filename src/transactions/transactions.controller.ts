@@ -18,15 +18,15 @@ export class TransactionsController {
   @ApiQuery({ 
     name: 'fromDate', 
     required: false, 
-    description: 'Filter by date (YYYY-MM-DD HH:MM:SS) หรือใส่ 0 เพื่อดึงข้อมูลของวันนี้ (or use 0 to get today data)', 
+    description: 'Filter by date (YYYY-MM-DD HH:MM:SS) หรือใส่ 0 เพื่อดึงข้อมูลทั้งหมด (or use 0 to get all data)', 
     examples: {
       specificDate: {
         value: '2025-08-05 16:08:00',
         description: 'ระบุวันที่เฉพาะ'
       },
-      todayData: {
+      allData: {
         value: '0',
-        description: 'ดึงข้อมูลของวันนี้'
+        description: 'ดึงข้อมูลทั้งหมด (ไม่ filter วันที่)'
       }
     }
   })
