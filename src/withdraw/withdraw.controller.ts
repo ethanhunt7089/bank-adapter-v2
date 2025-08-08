@@ -8,14 +8,15 @@ interface WithdrawRequest {
 }
 
 @ApiTags('Banking')
-@Controller()
+@Controller('bcel-api')
 export class WithdrawController {
   constructor(private readonly withdrawService: WithdrawService) {}
 
   @Post('withdraw')
   @ApiOperation({ 
     summary: 'Process withdrawal request', 
-    description: 'ส่งคำขอถอนเงินไปยังระบบ BCEL1 โดยระบุเลขบัญชี BCEL1 ปลายทางและจำนวนเงิน หน่วย LAK (Submit withdrawal request to BCEL1 system with target BCEL1 account number and amount in LAK currency unit)'
+    description: 'ส่งคำขอถอนเงินไปยังระบบ BCEL1 โดยระบุเลขบัญชี BCEL1 ปลายทางและจำนวนเงิน หน่วย LAK (Submit withdrawal request to BCEL1 system with target BCEL1 account number and amount in LAK currency unit)',
+    operationId: 'bcel-api/withdraw'
   })
   @ApiBearerAuth('JWT-auth')
   @ApiBody({ 

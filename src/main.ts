@@ -5,14 +5,15 @@ import { AppModule } from './app.module';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-  // Set global prefix
-  app.setGlobalPrefix('bcel-api');
+  // Set empty global prefix to avoid double prefix
+  app.setGlobalPrefix('');
 
   // Swagger Configuration
   const config = new DocumentBuilder()
     .setTitle('BCEL gateway API')
     .setDescription('BCEL gateway - Authentication & Banking Gateway')
     .setVersion('1.0.0')
+    .addServer('https://central-dragon-11.com/bcel-api')
     .addBearerAuth(
       {
         type: 'http',
@@ -29,7 +30,7 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, config);
   
   // Setup Swagger documentation
-  SwaggerModule.setup('bcel-api/doc', app, document, {
+  SwaggerModule.setup('doc', app, document, {
     customSiteTitle: 'BCEL gateway API',
     customfavIcon: '/favicon.ico',
     customCss: '.swagger-ui .topbar { display: none }',
@@ -45,6 +46,6 @@ async function bootstrap() {
 
   await app.listen(process.env.PORT ?? 3000);
   console.log(`🚀 Application is running on: http://localhost:${process.env.PORT ?? 3000}`);
-  console.log(`📖 Swagger documentation: http://localhost:${process.env.PORT ?? 3000}/bcel-api/doc`);
+  console.log(`📖 Swagger documentation: http://localhost:${process.env.PORT ?? 3000}/doc`);
 }
 bootstrap();

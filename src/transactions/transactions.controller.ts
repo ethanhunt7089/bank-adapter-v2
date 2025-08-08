@@ -3,14 +3,15 @@ import { ApiBearerAuth, ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@ne
 import { TransactionsService } from './transactions.service';
 
 @ApiTags('Banking')
-@Controller()
+@Controller('bcel-api')
 export class TransactionsController {
   constructor(private readonly transactionsService: TransactionsService) {}
 
   @Get('transactions')
   @ApiOperation({ 
     summary: 'Get transactions list', 
-    description: 'ดึงรายการธุรกรรมจากระบบ BCEL1 โดยสามารถกรองข้อมูลตามเลขบัญชี ชื่อบัญชี และวันที่ได้ (Retrieve transaction list from BCEL1 system with optional filters for account number, account name, and date)'
+    description: 'ดึงรายการธุรกรรมจากระบบ BCEL1 โดยสามารถกรองข้อมูลตามเลขบัญชี ชื่อบัญชี และวันที่ได้ (Retrieve transaction list from BCEL1 system with optional filters for account number, account name, and date)',
+    operationId: 'bcel-api/transactions'
   })
   @ApiBearerAuth('JWT-auth')
   @ApiQuery({ name: 'fromBankAccountNumber', required: false, description: 'Filter by bank account number(BCEL1 ACCOUNT NUMBER)', example: '110-12-00-1234567-001' })

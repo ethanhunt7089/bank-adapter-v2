@@ -3,14 +3,15 @@ import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagg
 import { BankAccountService } from './bank-account.service';
 
 @ApiTags('Banking')
-@Controller()
+@Controller('bcel-api')
 export class BankAccountController {
   constructor(private readonly bankAccountService: BankAccountService) {}
 
   @Get('bank-account')
   @ApiOperation({
     summary: 'Get bank accounts list',
-    description: 'ดึงรายการบัญชีธนาคาร BCEL1 ที่พร้อมใช้งานสำหรับฝาก/ถอนเงิน (Get available BCEL1 bank accounts for deposit/withdraw operations)'
+    description: 'ดึงรายการบัญชีธนาคาร BCEL1 ที่พร้อมใช้งานสำหรับฝาก/ถอนเงิน (Get available BCEL1 bank accounts for deposit/withdraw operations)',
+    operationId: 'bcel-api/bank-account'
   })
   @ApiBearerAuth('JWT-auth')
   @ApiResponse({
