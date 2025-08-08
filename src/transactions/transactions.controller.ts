@@ -59,7 +59,6 @@ export class TransactionsController {
                           example: {
            "success": true,
            "data": {
-             "success": true,
              "transactionTimestamp": "2024-08-13T22:43:19.000Z",
              "transactions": [
                {
@@ -133,10 +132,7 @@ export class TransactionsController {
         fromDate
       }, token);
       
-      return {
-        success: true,
-        data: result
-      };
+      return result
     } catch (error) {
       console.error('Get transactions error:', error);
       throw new HttpException(
