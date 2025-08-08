@@ -5,8 +5,6 @@ import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
 import { BankAccountModule } from './bank-account/bank-account.module';
 import { TransactionsModule } from './transactions/transactions.module';
-import { WithdrawModule } from './withdraw/withdraw.module';
-
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -15,7 +13,6 @@ import { WithdrawModule } from './withdraw/withdraw.module';
     AuthModule,
     BankAccountModule,
     TransactionsModule,
-    WithdrawModule,
   ],
   controllers: [AppController],
   providers: [AppService],
