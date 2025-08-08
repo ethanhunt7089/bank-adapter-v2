@@ -69,6 +69,38 @@ export class TransactionsService {
 
       const result = await response.json();
       
+             // Filter response to show only specific fields
+       if (result.data && result.data.transactions && Array.isArray(result.data.transactions)) {
+         result.data.transactions = result.data.transactions.map(transaction => ({
+           creditType: transaction.creditType,
+           amount: transaction.amount,
+           currency: transaction.currency,
+           status: transaction.status,
+           fromName: transaction.fromName,
+           fromBankCode: transaction.fromBankCode,
+           fromBankAccountNumber: transaction.fromBankAccountNumber,
+           toName: transaction.toName,
+           toBankCode: transaction.toBankCode,
+           toBankAccountNumber: transaction.toBankAccountNumber,
+           remarks: transaction.remarks,
+           transactionTimestamp: transaction.transferDateTime
+         }));
+       }
+       
+       // เพิ่ม transactionTimestamp ข้างนอกสุดเป็นเวลาล่าสุดของ record
+       if (result.data && result.data.transactions && Array.isArray(result.data.transactions) && result.data.transactions.length > 0) {
+         // หาเวลาล่าสุดจาก transactionTimestamp ของทุก record
+         const timestamps = result.data.transactions
+           .map(t => t.transactionTimestamp)
+           .filter(timestamp => timestamp) // กรองเฉพาะที่มี timestamp
+           .sort(); // เรียงลำดับจากเก่าไปใหม่
+         
+         if (timestamps.length > 0) {
+           // เอาตัวล่าสุด (ตัวสุดท้ายใน array ที่เรียงแล้ว)
+           result.data.transactionTimestamp = timestamps[timestamps.length - 1];
+         }
+       }
+      
       // บันทึก log (console.log แทน database)
       console.log('Transaction Log:', {
         targetDomain: backendUrl,

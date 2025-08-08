@@ -56,46 +56,29 @@ export class TransactionsController {
     description: 'Transactions retrieved successfully',
     content: {
       'application/json': {
-        example: {
-          "success": true,
-          "transactionTimestamp": "2025-08-06T03:06:41.000Z",
-          "data": {
-            "success": true,
-            "transactions": [
-              {
-                "id": "5f89f1ad-ca1b-4f0b-8e87-1974d881063c",
-                "creditType": "DEPOSIT_AUTO",
-                "amount": "50000",
-                "status": "PENDING",
-                "fromName": "PHOUSIT SOUPHIDA MR",
-                "fromBankCode": "BCEL",
-                "fromBankAccountNumber": "010-12-00-xxxxx282-001",
-                "toName": "PEELAR HOMSOMBUT MR",
-                "toBankCode": "BCEL",
-                "toBankAccountNumber": "0901230513851",
-                "remarks": "PHOUSIT SOUPHIDA MR - 010-12-00-xxxxx282-001",
-                "transferDateTime": "2025-08-05T20:06:41.000Z",
-                "createdAt": "2025-08-06T14:42:17.046Z",
-                "customerId": null,
-                "createdById": null,
-                "updatedAt": "2025-08-06T14:42:17.046Z",
-                "deletedAt": null,
-                "currency": "LAK",
-                "referenceNumber": "202508062114292",
-                "afterCredit": null,
-                "amountCredit": null,
-                "beforeCredit": null,
-                "isNotified": false,
-                "confirmOTP": null,
-                "bcelOneId": null,
-                "transferDateTimeV2": "2025-08-06T03:06:41.000Z",
-                "statementTime": "06/08/2025 03:06:41",
-                "customer": null,
-                "createdBy": null
-              }
-            ]
-          }
-        }
+                          example: {
+           "success": true,
+           "data": {
+             "success": true,
+             "transactionTimestamp": "2024-08-13T22:43:19.000Z",
+             "transactions": [
+               {
+                 "creditType": "DEPOSIT_AUTO",
+                 "amount": "150000",
+                 "currency": "LAK",
+                 "status": "SUCCESS",
+                 "fromName": "PHOUSIT SOUPHIDA MR",
+                 "fromBankCode": "BCEL",
+                 "fromBankAccountNumber": "010-12-00-xxxxx282-001",
+                 "toName": "SAO KIEWLUIVANH MS",
+                 "toBankCode": "BCEL",
+                 "toBankAccountNumber": "1011229916222",
+                 "remarks": "PHOUSIT SOUPHIDA MR - 010-12-00-xxxxx282-001",
+                 "transactionTimestamp": "2024-08-13T22:43:19.000Z"
+               }
+             ]
+           }
+         }
       }
     }
   })
