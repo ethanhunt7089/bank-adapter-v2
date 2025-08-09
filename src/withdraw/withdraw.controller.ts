@@ -1,5 +1,5 @@
-import { Body, Controller, HttpException, HttpStatus, Post, Query } from '@nestjs/common';
-import { ApiBody, ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { Body, Controller, Headers, HttpException, HttpStatus, Post } from '@nestjs/common';
+import { ApiBody, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { WithdrawService } from './withdraw.service';
 
 interface WithdrawRequest {
@@ -8,7 +8,7 @@ interface WithdrawRequest {
 }
 
 @ApiTags('Banking')
-@Controller('bcel-api')
+@Controller()
 export class WithdrawController {
   constructor(private readonly withdrawService: WithdrawService) {}
 
@@ -16,9 +16,9 @@ export class WithdrawController {
   @ApiOperation({ 
     summary: 'Process withdrawal request', 
     description: 'ส่งคำขอถอนเงินไปยังระบบ BCEL1 โดยระบุเลขบัญชี BCEL1 ปลายทางและจำนวนเงิน หน่วย LAK (Submit withdrawal request to BCEL1 system with target BCEL1 account number and amount in LAK currency unit)',
-    operationId: 'bcel-api/withdraw'
+    operationId: 'withdraw'
   })
-  @ApiQuery({ name: 'uuid', required: true, description: 'Token UUID สำหรับดึง target domain' })
+  // ไม่รับ uuid จาก query อีกต่อไป ใช้ Authorization header แทน
   @ApiBody({ 
     schema: {
       type: 'object',
@@ -87,13 +87,21 @@ export class WithdrawController {
     }
   })
   async withdraw(
-    @Query('uuid') uuid: string,
+    @Headers('authorization') authorization: string,
     @Body() withdrawRequest: WithdrawRequest
   ) {
     try {
-      if (!uuid) {
-        throw new HttpException('Missing required parameter: uuid', HttpStatus.BAD_REQUEST);
+      // ดึง uuid จาก Authorization: Bearer <uuid>
+      let uuid: string | undefined;
+      const match = /^\s*Bearer\s+(.+)\s*$/i.exec(authorization ?? '');
+      if (match && match[1]) {
+        let candidate = match[1].trim();
+        if ((candidate.startsWith('"') && candidate.endsWith('"')) || (candidate.startsWith("'") && candidate.endsWith("'"))) {
+          candidate = candidate.slice(1, -1);
+        }
+        uuid = candidate;
       }
+      if (!uuid) throw new HttpException('Missing required parameter: uuid', HttpStatus.BAD_REQUEST);
 
       // ตรวจสอบ required fields
       if (!withdrawRequest.accountNumber || !withdrawRequest.amount) {

@@ -1,9 +1,9 @@
-import { Controller, Get, ParseUUIDPipe, Query } from '@nestjs/common';
-import { ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { Controller, Get, Headers, HttpException, HttpStatus } from '@nestjs/common';
+import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { BankAccountService } from './bank-account.service';
 
 @ApiTags('Banking')
-@Controller('bcel-api')
+@Controller()
 export class BankAccountController {
   constructor(private readonly bankAccountService: BankAccountService) {}
 
@@ -11,9 +11,8 @@ export class BankAccountController {
   @ApiOperation({
     summary: 'Get bank accounts list',
     description: 'ดึงรายการบัญชีธนาคาร BCEL1 ที่พร้อมใช้งานสำหรับฝาก/ถอนเงิน (Get available BCEL1 bank accounts for deposit/withdraw operations)',
-    operationId: 'bcel-api/bank-account'
+    operationId: 'bank-account'
   })
-  @ApiQuery({ name: 'uuid', required: true, description: 'Token UUID สำหรับดึง target domain' })
   @ApiResponse({
     status: 200,
     description: 'Bank accounts retrieved successfully',
@@ -69,9 +68,22 @@ export class BankAccountController {
       }
     }
   })
-  async getBankAccounts(@Query('uuid', new ParseUUIDPipe({ version: '4' })) uuid: string) {
+  async getBankAccounts(@Headers('authorization') authorization?: string) {
+    // ดึง uuid จาก Authorization: Bearer <uuid>
+    let uuid: string | undefined;
+    const authHeader = authorization ?? '';
+    const match = /^\s*Bearer\s+(.+)\s*$/i.exec(authHeader);
+    if (match && match[1]) {
+      let candidate = match[1].trim();
+      if ((candidate.startsWith('"') && candidate.endsWith('"')) || (candidate.startsWith("'") && candidate.endsWith("'"))) {
+        candidate = candidate.slice(1, -1);
+      }
+      uuid = candidate;
+    }
+
+    console.log('🏦 [bank-account] uuid (from header):', uuid || 'undefined');
     if (!uuid) {
-      throw new Error('Missing required parameter: uuid');
+      throw new HttpException('Missing required parameter: uuid', HttpStatus.BAD_REQUEST);
     }
 
     console.log('🏦 Getting bank accounts by uuid...');

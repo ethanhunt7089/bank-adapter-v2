@@ -5,15 +5,14 @@ import { AppModule } from './app.module';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-  // Set empty global prefix to avoid double prefix
-  app.setGlobalPrefix('');
+  // ไม่ตั้งค่า global prefix เพื่อให้เส้นทางเป็นแบบตรง ๆ
 
   // Swagger Configuration
   const config = new DocumentBuilder()
     .setTitle('BCEL gateway API')
     .setDescription('BCEL gateway - Authentication & Banking Gateway')
     .setVersion('1.0.0')
-    .addServer('https://central-dragon-11.com/bcel-api')
+    // ไม่ fix server base URL เพื่อให้ Swagger ใช้ relative path ตรงกับแอป (ไม่มี /bcel-api)
     .addBearerAuth(
       {
         type: 'http',

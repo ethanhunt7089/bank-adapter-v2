@@ -1,9 +1,9 @@
-import { Controller, Get, HttpException, HttpStatus, Query } from '@nestjs/common';
+import { Controller, Get, Headers, HttpException, HttpStatus, Query } from '@nestjs/common';
 import { ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { TransactionsService } from './transactions.service';
 
 @ApiTags('Banking')
-@Controller('bcel-api')
+@Controller()
 export class TransactionsController {
   constructor(private readonly transactionsService: TransactionsService) {}
 
@@ -11,9 +11,9 @@ export class TransactionsController {
   @ApiOperation({ 
     summary: 'Get transactions list', 
     description: 'ดึงรายการธุรกรรมจากระบบ BCEL1 โดยสามารถกรองข้อมูลตามเลขบัญชี ชื่อบัญชี และวันที่ได้ (Retrieve transaction list from BCEL1 system with optional filters for account number, account name, and date)',
-    operationId: 'bcel-api/transactions'
+    operationId: 'transactions'
   })
-  @ApiQuery({ name: 'uuid', required: true, description: 'Token UUID สำหรับดึง target domain' })
+  // ไม่รับ uuid จาก query อีกต่อไป ใช้ Authorization header แทน
   @ApiQuery({ name: 'fromBankAccountNumber', required: false, description: 'Filter by bank account number(BCEL1 ACCOUNT NUMBER)', example: '110-12-00-1234567-001' })
   @ApiQuery({ name: 'fromName', required: false, description: 'Filter by account name(BCEL1 ACCOUNT NAME)', example: 'PHOUSIT SOUPHIDA MR' })
   @ApiQuery({ 
@@ -94,16 +94,24 @@ export class TransactionsController {
     }
   })
   async getTransactions(
-    @Query('uuid') uuid: string,
+    @Headers('authorization') authorization: string,
     @Query('fromBankAccountNumber') fromBankAccountNumber?: string,
     @Query('fromName') fromName?: string,
     @Query('fromDate') fromDate?: string,
     @Query('bankCode') bankCode?: string
   ) {
     try {
-      if (!uuid) {
-        throw new HttpException('Missing required parameter: uuid', HttpStatus.BAD_REQUEST);
+      // ดึง uuid จาก Authorization: Bearer <uuid>
+      let uuid: string | undefined;
+      const match = /^\s*Bearer\s+(.+)\s*$/i.exec(authorization ?? '');
+      if (match && match[1]) {
+        let candidate = match[1].trim();
+        if ((candidate.startsWith('"') && candidate.endsWith('"')) || (candidate.startsWith("'") && candidate.endsWith("'"))) {
+          candidate = candidate.slice(1, -1);
+        }
+        uuid = candidate;
       }
+      if (!uuid) throw new HttpException('Missing required parameter: uuid', HttpStatus.BAD_REQUEST);
 
       // Log parameters (bankCode ยังไม่ส่งไป backend)
       console.log('📊 Transaction parameters:', {
