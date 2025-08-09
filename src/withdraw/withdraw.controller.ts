@@ -1,5 +1,5 @@
-import { Body, Controller, HttpException, HttpStatus, Post, Request } from '@nestjs/common';
-import { ApiBearerAuth, ApiBody, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { Body, Controller, HttpException, HttpStatus, Post, Query } from '@nestjs/common';
+import { ApiBody, ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { WithdrawService } from './withdraw.service';
 
 interface WithdrawRequest {
@@ -18,7 +18,7 @@ export class WithdrawController {
     description: 'ส่งคำขอถอนเงินไปยังระบบ BCEL1 โดยระบุเลขบัญชี BCEL1 ปลายทางและจำนวนเงิน หน่วย LAK (Submit withdrawal request to BCEL1 system with target BCEL1 account number and amount in LAK currency unit)',
     operationId: 'bcel-api/withdraw'
   })
-  @ApiBearerAuth('JWT-auth')
+  @ApiQuery({ name: 'uuid', required: true, description: 'Token UUID สำหรับดึง target domain' })
   @ApiBody({ 
     schema: {
       type: 'object',
@@ -87,24 +87,12 @@ export class WithdrawController {
     }
   })
   async withdraw(
-    @Request() req: any,
+    @Query('uuid') uuid: string,
     @Body() withdrawRequest: WithdrawRequest
   ) {
     try {
-      // ตรวจสอบ token
-      const authorization = req.headers.authorization;
-      console.log('🔍 Authorization header:', authorization);
-      
-      if (!authorization || !authorization.startsWith('Bearer ')) {
-        console.log('❌ Invalid authorization header format');
-        throw new HttpException('Missing or invalid authorization header', HttpStatus.UNAUTHORIZED);
-      }
-
-      const token = authorization.replace('Bearer ', '');
-      const isValidToken = await this.withdrawService.validateToken(token);
-      
-      if (!isValidToken) {
-        throw new HttpException('Invalid token', HttpStatus.UNAUTHORIZED);
+      if (!uuid) {
+        throw new HttpException('Missing required parameter: uuid', HttpStatus.BAD_REQUEST);
       }
 
       // ตรวจสอบ required fields
@@ -118,7 +106,7 @@ export class WithdrawController {
       }
 
       // เรียก backend API
-      const result = await this.withdrawService.processWithdraw(withdrawRequest, token);
+      const result = await this.withdrawService.processWithdraw(withdrawRequest, uuid);
       
       return {
         success: true,

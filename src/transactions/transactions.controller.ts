@@ -1,5 +1,5 @@
-import { Controller, Get, HttpException, HttpStatus, Query, Request } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { Controller, Get, HttpException, HttpStatus, Query } from '@nestjs/common';
+import { ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { TransactionsService } from './transactions.service';
 
 @ApiTags('Banking')
@@ -13,7 +13,7 @@ export class TransactionsController {
     description: 'ดึงรายการธุรกรรมจากระบบ BCEL1 โดยสามารถกรองข้อมูลตามเลขบัญชี ชื่อบัญชี และวันที่ได้ (Retrieve transaction list from BCEL1 system with optional filters for account number, account name, and date)',
     operationId: 'bcel-api/transactions'
   })
-  @ApiBearerAuth('JWT-auth')
+  @ApiQuery({ name: 'uuid', required: true, description: 'Token UUID สำหรับดึง target domain' })
   @ApiQuery({ name: 'fromBankAccountNumber', required: false, description: 'Filter by bank account number(BCEL1 ACCOUNT NUMBER)', example: '110-12-00-1234567-001' })
   @ApiQuery({ name: 'fromName', required: false, description: 'Filter by account name(BCEL1 ACCOUNT NAME)', example: 'PHOUSIT SOUPHIDA MR' })
   @ApiQuery({ 
@@ -94,27 +94,15 @@ export class TransactionsController {
     }
   })
   async getTransactions(
-    @Request() req: any,
+    @Query('uuid') uuid: string,
     @Query('fromBankAccountNumber') fromBankAccountNumber?: string,
     @Query('fromName') fromName?: string,
     @Query('fromDate') fromDate?: string,
     @Query('bankCode') bankCode?: string
   ) {
     try {
-      // ตรวจสอบ token
-      const authorization = req.headers.authorization;
-      console.log('🔍 Authorization header:', authorization);
-      
-      if (!authorization || !authorization.startsWith('Bearer ')) {
-        console.log('❌ Invalid authorization header format');
-        throw new HttpException('Missing or invalid authorization header', HttpStatus.UNAUTHORIZED);
-      }
-
-      const token = authorization.replace('Bearer ', '');
-      const isValidToken = await this.transactionsService.validateToken(token);
-      
-      if (!isValidToken) {
-        throw new HttpException('Invalid token', HttpStatus.UNAUTHORIZED);
+      if (!uuid) {
+        throw new HttpException('Missing required parameter: uuid', HttpStatus.BAD_REQUEST);
       }
 
       // Log parameters (bankCode ยังไม่ส่งไป backend)
@@ -125,12 +113,12 @@ export class TransactionsController {
         bankCode: bankCode || '(not specified)'
       });
 
-      // เรียก backend API (ยังไม่ส่ง bankCode)
+      // เรียก backend API ด้วย uuid (ไม่ใช้ JWT แล้ว)
       const result = await this.transactionsService.processGetTransactions({
         fromBankAccountNumber,
         fromName,
         fromDate
-      }, token);
+      }, uuid);
       
       return result
     } catch (error) {

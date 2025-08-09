@@ -1,5 +1,5 @@
 import { HttpException, Injectable } from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
+import { getTargetDomainAndTokenByUuid } from '../lib/token-utils';
 
 interface WithdrawRequest {
   accountNumber: string;
@@ -8,44 +8,33 @@ interface WithdrawRequest {
 
 @Injectable()
 export class WithdrawService {
-  constructor(
-    private readonly jwtService: JwtService
-  ) {}
+  constructor() {}
 
-  async validateToken(token: string): Promise<boolean> {
-    try {
-      const payload = this.jwtService.verify(token);
-      // ตรวจสอบว่า token ถูกต้อง (ไม่หมดอายุ, format ถูกต้อง)
-      return !!payload;
-    } catch (error) {
-      console.error('Token validation error:', error);
-      return false;
-    }
-  }
+  // เลิกใช้ JWT ตรวจสอบแล้ว
 
-  async processWithdraw(withdrawRequest: WithdrawRequest, token: string) {
+  async processWithdraw(withdrawRequest: WithdrawRequest, uuid: string) {
     try {
-      // ตรวจสอบ token และดึง target_domain
-      const payload = this.jwtService.verify(token);
-      const backendUrl = payload.target_domain;
-      
-      if (!backendUrl) {
-        throw new HttpException('Invalid token: missing target_domain', 401);
+      // ดึง targetDomain และ tokenHash จาก DB ด้วย UUID
+      const resolved = await getTargetDomainAndTokenByUuid(uuid);
+      if (!resolved) {
+        throw new HttpException('Invalid uuid: token not found or inactive', 400);
       }
+      const { targetDomain: backendUrl, tokenHash } = resolved;
 
-      // เรียก backend withdraw API
+      // เรียก backend withdraw API (ส่ง uuid ผ่าน Authorization header)
       const fullUrl = `${backendUrl}/api/withdraw`;
       
-      console.log('🌐 Backend URL from token:', backendUrl);
+      console.log('🌐 Backend URL from uuid:', backendUrl);
       console.log('🔗 Full URL:', fullUrl);
-      console.log('🔑 Using token:', token);
+      console.log('🔑 Forwarding uuid in Authorization header');
       console.log('💰 Withdraw request:', withdrawRequest);
       
       const response = await fetch(fullUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          // ส่ง uuid ผ่าน Authorization header ตามที่ร้องขอ
+          'Authorization': `Bearer ${uuid}`
         },
         body: JSON.stringify(withdrawRequest)
       });

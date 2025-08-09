@@ -1,5 +1,5 @@
-import { Controller, Get, Request } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { Controller, Get, ParseUUIDPipe, Query } from '@nestjs/common';
+import { ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { BankAccountService } from './bank-account.service';
 
 @ApiTags('Banking')
@@ -13,7 +13,7 @@ export class BankAccountController {
     description: 'ดึงรายการบัญชีธนาคาร BCEL1 ที่พร้อมใช้งานสำหรับฝาก/ถอนเงิน (Get available BCEL1 bank accounts for deposit/withdraw operations)',
     operationId: 'bcel-api/bank-account'
   })
-  @ApiBearerAuth('JWT-auth')
+  @ApiQuery({ name: 'uuid', required: true, description: 'Token UUID สำหรับดึง target domain' })
   @ApiResponse({
     status: 200,
     description: 'Bank accounts retrieved successfully',
@@ -46,13 +46,13 @@ export class BankAccountController {
     }
   })
   @ApiResponse({
-    status: 401,
-    description: 'Unauthorized - Invalid token',
+    status: 400,
+    description: 'Missing uuid',
     content: {
       'application/json': {
         example: {
-          "statusCode": 401,
-          "message": "Missing or invalid authorization header"
+          "statusCode": 400,
+          "message": "Missing required parameter: uuid"
         }
       }
     }
@@ -69,17 +69,15 @@ export class BankAccountController {
       }
     }
   })
-  async getBankAccounts(@Request() req: any) {
-    const token = req.headers.authorization?.replace('Bearer ', '');
-    
-    if (!token) {
-      throw new Error('Missing or invalid authorization header');
+  async getBankAccounts(@Query('uuid', new ParseUUIDPipe({ version: '4' })) uuid: string) {
+    if (!uuid) {
+      throw new Error('Missing required parameter: uuid');
     }
 
-    console.log('🏦 Getting bank accounts...');
+    console.log('🏦 Getting bank accounts by uuid...');
     
     try {
-      const result = await this.bankAccountService.getBankAccounts(token);
+      const result = await this.bankAccountService.getBankAccounts(uuid);
       
       console.log('Bank Accounts Log:', {
         endpoint: '/bank-account',

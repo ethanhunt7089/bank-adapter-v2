@@ -13,6 +13,7 @@ datasource db {
 // Tokens (รวมข้อมูล client และ token)
 model Token {
   id          Int      @id @default(autoincrement())
+  uuid        String   @unique @default(uuid()) @map("uuid")
   targetDomain String  @unique @map("target_domain")
   tokenHash   String?  @unique @map("token_hash")
   isActive    Boolean  @default(true) @map("is_active")
@@ -28,6 +29,7 @@ model Token {
 // API Logs
 model ApiLog {
   id          Int      @id @default(autoincrement())
+  uuid        String   @unique @default(uuid()) @map("uuid")
   targetDomain String  @map("target_domain")
   endpoint    String
   method      String

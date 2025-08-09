@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Post, Request } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Post, Query } from '@nestjs/common';
 import { ApiExcludeController } from '@nestjs/swagger';
 import {
   AuthService,
@@ -36,13 +36,22 @@ export class AuthController {
 
   @Get('verify')
   @HttpCode(HttpStatus.OK)
-  async verifyToken(@Request() req: any) {
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return { success: false, error: 'Missing or invalid Authorization header' };
-    }
+  async verifyToken(@Query('uuid') uuid?: string) {
+    try {
+      if (!uuid) {
+        return { success: false, error: 'Missing required parameter: uuid' };
+      }
 
-    const token = authHeader.substring(7);
-    return this.authService.validateToken({ token });
+      const { getTargetDomainByUuid } = await import('../lib/token-utils');
+      const targetDomain = await getTargetDomainByUuid(uuid);
+
+      if (!targetDomain) {
+        return { success: false, error: 'Token not found or inactive', uuid };
+      }
+
+      return { success: true, uuid, targetDomain };
+    } catch (error: any) {
+      return { success: false, error: error?.message ?? 'Internal server error' };
+    }
   }
 }

@@ -1,38 +1,26 @@
 import { HttpException, Injectable } from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
+import { getTargetDomainAndTokenByUuid } from '../lib/token-utils';
 
 @Injectable()
 export class TransactionsService {
-  constructor(
-    private readonly jwtService: JwtService
-  ) {}
+  constructor() {}
 
-  async validateToken(token: string): Promise<boolean> {
-    try {
-      const payload = this.jwtService.verify(token);
-      // ตรวจสอบว่า token ถูกต้อง (ไม่หมดอายุ, format ถูกต้อง)
-      return !!payload;
-    } catch (error) {
-      console.error('Token validation error:', error);
-      return false;
-    }
-  }
+  // เลิกใช้ JWT ตรวจสอบแล้ว
 
   async processGetTransactions(queryData: {
     fromBankAccountNumber?: string;
     fromName?: string;
     fromDate?: string;
-  }, token: string) {
+  }, uuid: string) {
     try {
-      // ตรวจสอบ token และดึง target_domain
-      const payload = this.jwtService.verify(token);
-      const backendUrl = payload.target_domain;
-      
-      if (!backendUrl) {
-        throw new HttpException('Invalid token: missing target_domain', 401);
+      // ดึง targetDomain และ tokenHash จาก DB ด้วย UUID
+      const resolved = await getTargetDomainAndTokenByUuid(uuid);
+      if (!resolved) {
+        throw new HttpException('Invalid uuid: token not found or inactive', 400);
       }
+      const { targetDomain: backendUrl, tokenHash } = resolved;
 
-      // สร้าง query string
+      // สร้าง query string (ไม่ส่ง uuid ใน query อีกต่อไป)
       const queryParams = new URLSearchParams();
       if (queryData.fromBankAccountNumber) {
         queryParams.append('fromBankAccountNumber', queryData.fromBankAccountNumber);
@@ -47,15 +35,16 @@ export class TransactionsService {
       // เรียก backend API
       const fullUrl = `${backendUrl}/api/transactions?${queryParams.toString()}`;
       
-      console.log('🌐 Backend URL from token:', backendUrl);
+      console.log('🌐 Backend URL from uuid:', backendUrl);
       console.log('🔗 Full URL:', fullUrl);
-      console.log('🔑 Using token:', token);
+      console.log('🔑 Forwarding uuid in Authorization header');
       
       const response = await fetch(fullUrl, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          // ส่ง uuid ผ่าน Authorization header ตามที่ร้องขอ
+          'Authorization': `Bearer ${uuid}`
         }
       });
 
