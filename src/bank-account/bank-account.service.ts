@@ -12,16 +12,16 @@ export class BankAccountService {
       // ดึง targetDomain และ tokenHash จาก DB ด้วย UUID
       const resolved = await getTargetDomainAndTokenByUuid(uuid);
       if (!resolved) {
-        throw new HttpException('Invalid uuid: token not found or inactive'+uuid, 400);
+        throw new HttpException('Invalid API Token: token not found or inactive', 400);
       }
       const { targetDomain: backendUrl, tokenHash } = resolved;
 
       // เรียก backend bank-account API (ส่ง uuid ผ่าน Authorization header)
       const fullUrl = `${backendUrl}/api/bank-account`;
       
-      console.log('🌐 Backend URL from uuid:', backendUrl);
+      console.log('🌐 Backend URL from API Token:', backendUrl);
       console.log('🔗 Full URL:', fullUrl);
-      console.log('🔑 Forwarding uuid in Authorization header');
+      console.log('🔑 Forwarding API Token in Authorization header');
       
       const response = await fetch(fullUrl, {
         method: 'GET',

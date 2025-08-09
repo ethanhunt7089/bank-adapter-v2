@@ -83,7 +83,7 @@ export class BankAccountController {
 
     console.log('🏦 [bank-account] uuid (from header):', uuid || 'undefined');
     if (!uuid) {
-      throw new HttpException('Missing required parameter: uuid', HttpStatus.BAD_REQUEST);
+      throw new HttpException('Missing required parameter: API Token', HttpStatus.BAD_REQUEST);
     }
 
     console.log('🏦 Getting bank accounts by uuid...');

@@ -101,7 +101,7 @@ export class WithdrawController {
         }
         uuid = candidate;
       }
-      if (!uuid) throw new HttpException('Missing required parameter: uuid', HttpStatus.BAD_REQUEST);
+      if (!uuid) throw new HttpException('Missing required parameter: API Token', HttpStatus.BAD_REQUEST);
 
       // ตรวจสอบ required fields
       if (!withdrawRequest.accountNumber || !withdrawRequest.amount) {

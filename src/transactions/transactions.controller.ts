@@ -16,21 +16,7 @@ export class TransactionsController {
   // ไม่รับ uuid จาก query อีกต่อไป ใช้ Authorization header แทน
   @ApiQuery({ name: 'fromBankAccountNumber', required: false, description: 'Filter by bank account number(BCEL1 ACCOUNT NUMBER)', example: '110-12-00-1234567-001' })
   @ApiQuery({ name: 'fromName', required: false, description: 'Filter by account name(BCEL1 ACCOUNT NAME)', example: 'PHOUSIT SOUPHIDA MR' })
-  @ApiQuery({ 
-    name: 'fromDate', 
-    required: false, 
-    description: 'Filter by date (YYYY-MM-DD HH:MM:SS) หรือใส่ 0 เพื่อดึงข้อมูลทั้งหมด (or use 0 to get all data)', 
-    examples: {
-      specificDate: {
-        value: '2025-08-05 16:08:00',
-        description: 'ระบุวันที่เฉพาะ'
-      },
-      allData: {
-        value: '0',
-        description: 'ดึงข้อมูลทั้งหมด (ไม่ filter วันที่)'
-      }
-    }
-  })
+  // ไม่รับ fromDate แล้ว ระบบจะคำนวนเองจาก cursor ต่อ API Token
   @ApiQuery({ 
     name: 'bankCode', 
     required: false, 
@@ -97,7 +83,6 @@ export class TransactionsController {
     @Headers('authorization') authorization: string,
     @Query('fromBankAccountNumber') fromBankAccountNumber?: string,
     @Query('fromName') fromName?: string,
-    @Query('fromDate') fromDate?: string,
     @Query('bankCode') bankCode?: string
   ) {
     try {
@@ -111,21 +96,19 @@ export class TransactionsController {
         }
         uuid = candidate;
       }
-      if (!uuid) throw new HttpException('Missing required parameter: uuid', HttpStatus.BAD_REQUEST);
+      if (!uuid) throw new HttpException('Missing required parameter: API Token', HttpStatus.BAD_REQUEST);
 
       // Log parameters (bankCode ยังไม่ส่งไป backend)
       console.log('📊 Transaction parameters:', {
         fromBankAccountNumber,
         fromName, 
-        fromDate,
         bankCode: bankCode || '(not specified)'
       });
 
       // เรียก backend API ด้วย uuid (ไม่ใช้ JWT แล้ว)
       const result = await this.transactionsService.processGetTransactions({
         fromBankAccountNumber,
-        fromName,
-        fromDate
+        fromName
       }, uuid);
       
       return result
