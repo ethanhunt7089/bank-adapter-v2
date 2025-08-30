@@ -1,31 +1,15 @@
 import { Controller, Post, Body, Logger } from "@nestjs/common";
-import { ApiTags, ApiOperation, ApiBody, ApiResponse } from "@nestjs/swagger";
+import { ApiExcludeController } from "@nestjs/swagger";
 import { PaymentService } from "../services/payment.service";
 
-@ApiTags("Webhooks")
-@Controller("webhooks")
+@ApiExcludeController()
+@Controller()
 export class WebhookController {
   private readonly logger = new Logger(WebhookController.name);
 
   constructor(private readonly paymentService: PaymentService) {}
 
-  @Post("bibpay")
-  @ApiOperation({ summary: "Receive webhook from BIB-Pay" })
-  @ApiBody({
-    description: "Webhook data from BIB-Pay",
-    schema: {
-      type: "object",
-      properties: {
-        refCode: { type: "string", example: "trx-001" },
-        status: { type: "string", example: "success" },
-        transactionId: { type: "string", example: "TRX-BIB-1234567890-ABC123" },
-        amount: { type: "number", example: 100 },
-        message: { type: "string", example: "Payment completed" },
-        data: { type: "object" },
-      },
-    },
-  })
-  @ApiResponse({ status: 200, description: "Webhook received successfully" })
+  @Post("webhooks/bibpay")
   async handleBibPayWebhook(@Body() webhookData: any) {
     // Log ข้อมูลที่ได้รับจาก BIB-Pay
     this.logger.log("=== BIB-Pay Webhook Received ===");
@@ -73,26 +57,7 @@ export class WebhookController {
     }
   }
 
-  @Post("easypay")
-  @ApiOperation({ summary: "Receive webhook from Easy-Pay" })
-  @ApiBody({
-    description: "Webhook data from Easy-Pay",
-    schema: {
-      type: "object",
-      properties: {
-        refCode: { type: "string", example: "trx-002" },
-        status: { type: "string", example: "success" },
-        transactionId: {
-          type: "string",
-          example: "TRX-EASY-1234567890-DEF456",
-        },
-        amount: { type: "number", example: 200 },
-        message: { type: "string", example: "Payment completed" },
-        data: { type: "object" },
-      },
-    },
-  })
-  @ApiResponse({ status: 200, description: "Webhook received successfully" })
+  @Post("webhooks/easypay")
   async handleEasyPayWebhook(@Body() webhookData: any) {
     // Log ข้อมูลที่ได้รับจาก Easy-Pay
     this.logger.log("=== Easy-Pay Webhook Received ===");

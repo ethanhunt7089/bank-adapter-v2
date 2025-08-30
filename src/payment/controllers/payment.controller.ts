@@ -8,13 +8,16 @@ import {
   HttpException,
   HttpStatus,
   Logger,
+  Req,
 } from "@nestjs/common";
+import { Request } from "express";
 import {
   ApiTags,
   ApiOperation,
   ApiResponse,
   ApiHeader,
   ApiBody,
+  ApiSecurity,
 } from "@nestjs/swagger";
 import { PaymentService } from "../services/payment.service";
 import { CreateDepositDto } from "../dto/create-deposit.dto";
@@ -25,24 +28,18 @@ import {
 } from "../interfaces/payment-gateway.interface";
 
 @ApiTags("Payment Gateway")
-@Controller("api")
+@Controller()
 export class PaymentController {
   private readonly logger = new Logger(PaymentController.name);
 
   constructor(private readonly paymentService: PaymentService) {}
 
   @Post("create-deposit")
+  @ApiSecurity("API Token")
   @ApiOperation({
     summary: "Create deposit transaction",
     description:
       "สร้างธุรกรรมฝากเงินผ่าน Payment Gateway (BIB-Pay, Easy-Pay) โดยใช้ API Token จาก Authorization header",
-  })
-  @ApiHeader({
-    name: "authorization",
-    description:
-      "Bearer <uuid> - API Token สำหรับการยืนยันตัวตนและตรวจสอบ payment system ที่รองรับ",
-    required: true,
-    example: "Bearer 123e4567-e89b-12d3-a456-426614174000",
   })
   @ApiBody({
     type: CreateDepositDto,
@@ -87,15 +84,17 @@ export class PaymentController {
   })
   async createDeposit(
     @Body() payload: CreateDepositPayload,
-    @Headers("authorization") authorization: string
+    @Req() request: Request
   ) {
     try {
       this.logger.log(`Creating deposit with ref: ${payload.refCode}`);
 
-      // ดึง uuid จาก Authorization: Bearer <uuid>
+      // ดึง uuid จาก Authorization: Bearer <uuid> หรือส่ง UUID ตรงๆ
+      const authHeader = (request.headers["authorization"] ?? "") as string;
+
       let uuid: string | undefined;
-      const match = /^\s*Bearer\s+(.+)\s*$/i.exec(authorization ?? "");
-      if (match && match[1]) {
+      const match = /^\s*Bearer\s+(.+)\s*$/i.exec(authHeader);
+      if (match?.[1]) {
         let candidate = match[1].trim();
         if (
           (candidate.startsWith('"') && candidate.endsWith('"')) ||
@@ -104,12 +103,16 @@ export class PaymentController {
           candidate = candidate.slice(1, -1);
         }
         uuid = candidate;
+      } else if (authHeader) {
+        uuid = authHeader.trim();
       }
-      if (!uuid)
+
+      if (!uuid) {
         throw new HttpException(
-          "Missing required parameter: API Token",
-          HttpStatus.BAD_REQUEST
+          "Missing or invalid authorization header",
+          HttpStatus.UNAUTHORIZED
         );
+      }
 
       const result = await this.paymentService.createDeposit(payload, uuid);
 
@@ -140,17 +143,11 @@ export class PaymentController {
   }
 
   @Post("create-withdraw")
+  @ApiSecurity("API Token")
   @ApiOperation({
     summary: "Create withdraw transaction",
     description:
       "สร้างธุรกรรมถอนเงินผ่าน Payment Gateway (BIB-Pay, Easy-Pay) โดยใช้ API Token จาก Authorization header",
-  })
-  @ApiHeader({
-    name: "authorization",
-    description:
-      "Bearer <uuid> - API Token สำหรับการยืนยันตัวตนและตรวจสอบ payment system ที่รองรับ",
-    required: true,
-    example: "Bearer 123e4567-e89b-12d3-a456-426614174000",
   })
   @ApiBody({
     type: CreateWithdrawDto,
@@ -194,15 +191,17 @@ export class PaymentController {
   })
   async createWithdraw(
     @Body() payload: CreateWithdrawPayload,
-    @Headers("authorization") authorization: string
+    @Req() request: Request
   ) {
     try {
       this.logger.log(`Creating withdraw with ref: ${payload.refCode}`);
 
-      // ดึง uuid จาก Authorization: Bearer <uuid>
+      // ดึง uuid จาก Authorization: Bearer <uuid> หรือส่ง UUID ตรงๆ
+      const authHeader = (request.headers["authorization"] ?? "") as string;
+
       let uuid: string | undefined;
-      const match = /^\s*Bearer\s+(.+)\s*$/i.exec(authorization ?? "");
-      if (match && match[1]) {
+      const match = /^\s*Bearer\s+(.+)\s*$/i.exec(authHeader);
+      if (match?.[1]) {
         let candidate = match[1].trim();
         if (
           (candidate.startsWith('"') && candidate.endsWith('"')) ||
@@ -211,12 +210,16 @@ export class PaymentController {
           candidate = candidate.slice(1, -1);
         }
         uuid = candidate;
+      } else if (authHeader) {
+        uuid = authHeader.trim();
       }
-      if (!uuid)
+
+      if (!uuid) {
         throw new HttpException(
-          "Missing required parameter: API Token",
-          HttpStatus.BAD_REQUEST
+          "Missing or invalid authorization header",
+          HttpStatus.UNAUTHORIZED
         );
+      }
 
       const result = await this.paymentService.createWithdraw(payload, uuid);
 
@@ -246,6 +249,7 @@ export class PaymentController {
   }
 
   @Get("deposit-status/:refCode")
+  @ApiSecurity("API Token")
   @ApiOperation({
     summary: "Get deposit status",
     description: "ดูสถานะธุรกรรมฝากเงินตามรหัสอ้างอิง",
@@ -277,6 +281,18 @@ export class PaymentController {
     },
   })
   @ApiResponse({
+    status: 401,
+    description: "Unauthorized - Invalid token",
+    content: {
+      "application/json": {
+        example: {
+          statusCode: 401,
+          message: "Missing or invalid authorization header",
+        },
+      },
+    },
+  })
+  @ApiResponse({
     status: 404,
     description: "Deposit not found",
     content: {
@@ -288,7 +304,10 @@ export class PaymentController {
       },
     },
   })
-  async getDepositStatus(@Param("refCode") refCode: string) {
+  async getDepositStatus(
+    @Param("refCode") refCode: string,
+    @Req() request: Request
+  ) {
     try {
       this.logger.log(`Getting deposit status for ref: ${refCode}`);
 
@@ -330,6 +349,7 @@ export class PaymentController {
   }
 
   @Get("withdraw-status/:refCode")
+  @ApiSecurity("API Token")
   @ApiOperation({
     summary: "Get withdraw status",
     description: "ดูสถานะธุรกรรมถอนเงินตามรหัสอ้างอิง",
@@ -358,6 +378,18 @@ export class PaymentController {
     },
   })
   @ApiResponse({
+    status: 401,
+    description: "Unauthorized - Invalid token",
+    content: {
+      "application/json": {
+        example: {
+          statusCode: 401,
+          message: "Missing or invalid authorization header",
+        },
+      },
+    },
+  })
+  @ApiResponse({
     status: 404,
     description: "Withdraw not found",
     content: {
@@ -369,7 +401,10 @@ export class PaymentController {
       },
     },
   })
-  async getWithdrawStatus(@Param("refCode") refCode: string) {
+  async getWithdrawStatus(
+    @Param("refCode") refCode: string,
+    @Req() request: Request
+  ) {
     try {
       this.logger.log(`Getting withdraw status for ref: ${refCode}`);
 
@@ -409,16 +444,10 @@ export class PaymentController {
   }
 
   @Get("balance")
+  @ApiSecurity("API Token")
   @ApiOperation({
     summary: "Get account balance",
     description: "ดูยอดเงินคงเหลือในบัญชี Payment Gateway",
-  })
-  @ApiHeader({
-    name: "authorization",
-    description:
-      "Bearer <uuid> - API Token สำหรับการยืนยันตัวตนและตรวจสอบ payment system ที่รองรับ",
-    required: true,
-    example: "Bearer 123e4567-e89b-12d3-a456-426614174000",
   })
   @ApiResponse({
     status: 200,
@@ -458,14 +487,15 @@ export class PaymentController {
       },
     },
   })
-  async getBalance(@Headers("authorization") authorization: string) {
+  async getBalance(@Req() request: Request) {
     try {
       this.logger.log("Getting account balance");
+      // ดึง uuid จาก Authorization: Bearer <uuid> หรือส่ง UUID ตรงๆ
+      const authHeader = (request.headers["authorization"] ?? "") as string;
 
-      // ดึง uuid จาก Authorization: Bearer <uuid>
       let uuid: string | undefined;
-      const match = /^\s*Bearer\s+(.+)\s*$/i.exec(authorization ?? "");
-      if (match && match[1]) {
+      const match = /^\s*Bearer\s+(.+)\s*$/i.exec(authHeader);
+      if (match?.[1]) {
         let candidate = match[1].trim();
         if (
           (candidate.startsWith('"') && candidate.endsWith('"')) ||
@@ -474,12 +504,16 @@ export class PaymentController {
           candidate = candidate.slice(1, -1);
         }
         uuid = candidate;
+      } else if (authHeader) {
+        uuid = authHeader.trim();
       }
-      if (!uuid)
+
+      if (!uuid) {
         throw new HttpException(
-          "Missing required parameter: API Token",
-          HttpStatus.BAD_REQUEST
+          "Missing or invalid authorization header",
+          HttpStatus.UNAUTHORIZED
         );
+      }
 
       const result = await this.paymentService.getBalance(uuid);
 

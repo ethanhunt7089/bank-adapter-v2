@@ -10,8 +10,7 @@ export class TransactionsService {
 
   async processGetTransactions(
     queryData: {
-      fromBankAccountNumber?: string;
-      fromName?: string;
+      accountNumber: string; // comma-separated
     },
     uuid: string
   ) {
@@ -26,76 +25,89 @@ export class TransactionsService {
       }
       const { targetDomain: backendUrl, tokenHash } = resolved;
 
-      // อ่าน cursor ต่อ API Token
-      const cursor = await prisma.transactionCursor
-        .findFirst({ where: { tokenUuid: uuid } })
-        .catch(() => null);
-
-      // คำนวณ fromDate: ครั้งแรก → '0', ถัดไป → lastSeenAt (LA time, +1s) ฟอร์แมต 'YYYY-MM-DD HH:mm:ss'
-      const toLaosTime = (d: Date) =>
+      // Helpers เวลาไทย (UTC+7)
+      const toThailandTime = (d: Date) =>
         new Date(d.getTime() + 7 * 60 * 60 * 1000);
-      const plusOneSecond = (d: Date) => new Date(d.getTime() + 1000);
-      const formatDateTime = (d: Date) => {
+      const formatDateTime = (dateStr: string) => {
+        const d = new Date(dateStr);
         const pad = (n: number) => n.toString().padStart(2, "0");
-        const yyyy = d.getFullYear();
-        const MM = pad(d.getMonth() + 1);
-        const dd = pad(d.getDate());
-        const HH = pad(d.getHours());
-        const mm = pad(d.getMinutes());
-        const ss = pad(d.getSeconds());
+        const yyyy = d.getUTCFullYear(); // ใช้ UTC
+        const MM = pad(d.getUTCMonth() + 1); // ใช้ UTC
+        const dd = pad(d.getUTCDate()); // ใช้ UTC
+        const HH = pad(d.getUTCHours()); // ใช้ UTC
+        const mm = pad(d.getUTCMinutes()); // ใช้ UTC
+        const ss = pad(d.getUTCSeconds()); // ใช้ UTC
         return `${yyyy}-${MM}-${dd} ${HH}:${mm}:${ss}`;
       };
 
-      const computedFromDate = cursor
-        ? plusOneSecond(new Date(cursor.lastSeenAt))
-        : null;
-      const fromDateParam = computedFromDate
-        ? formatDateTime(toLaosTime(computedFromDate))
-        : "0";
-
-      const queryParams = new URLSearchParams();
-      // ส่งครบทุกพารามิเตอร์ตามข้อกำหนดของ upstream
-      queryParams.append(
-        "fromBankAccountNumber",
-        queryData.fromBankAccountNumber ?? ""
-      );
-      queryParams.append("fromName", queryData.fromName ?? "");
-      queryParams.append("fromDate", fromDateParam);
-      // หมายเหตุ: ไม่รับ fromDate จากผู้ใช้แล้ว ส่วนนี้ถูกคำนวณเองด้านบน
-
-      // เรียก backend API
-      const fullUrl = `${backendUrl}/api/transactions?${queryParams.toString()}`;
-
-      console.log("🌐 Backend URL from API Token:", backendUrl);
-      console.log("🔗 Full URL:", fullUrl);
-      console.log("🔑 Forwarding API Token in Authorization header");
-      console.log(
-        "🕒 Using fromDate (LA +1s):",
-        fromDateParam,
-        "| cursor:",
-        cursor?.lastSeenAt ?? "none"
+      // แตกเป็นคำขอต่อบัญชี เพื่อให้ได้ข้อมูลใหม่เสมอ
+      const accountList = Array.from(
+        new Set(
+          queryData.accountNumber
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean)
+        )
       );
 
-      const response = await fetch(fullUrl, {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-          // ส่ง uuid ผ่าน Authorization header ตามที่ร้องขอ
-          Authorization: `Bearer ${uuid}`,
-        },
-      });
+      // ดึง cursor ของทุกบัญชีเพื่อคำนวณ fromDate เป็นรายบัญชี
+      const cursorsAll = accountList.length
+        ? await prisma.transactionCursor
+            .findMany({
+              where: {
+                tokenUuid: uuid,
+                from_bank_account_number: { in: accountList },
+              },
+            })
+            .catch(() => [])
+        : [];
+      console.log("cursorsAll: " + JSON.stringify(cursorsAll!));
+      const accountToCursor = new Map<string, string>();
+      for (const c of cursorsAll)
+        accountToCursor.set(c.from_bank_account_number, c.lastSeenAt);
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new HttpException(
-          errorData.error || "Backend API error",
-          response.status
-        );
-      }
+      // เรียก backend ต่อบัญชีแบบขนาน
+      const perAccountResponses = await Promise.all(
+        accountList.map(async (acc) => {
+          const lastSeen = accountToCursor.get(acc);
+          console.log(
+            "lastSeenlastSeenlastSeenlastSeenlastSeenlastSeen: " + lastSeen
+          );
+          console.log(
+            "lastSeenlastSeenlastSeenlastSeenlastSeenlastSeen: " + lastSeen
+          );
+          // แก้ไขตรงนี้: ไม่ต้องบวก 1 วินาที
+          const fromDateParam = lastSeen ? formatDateTime(lastSeen) : "0";
 
-      const result: any = await response.json();
+          const params = new URLSearchParams();
+          params.append("accountNumber", acc);
+          params.append("fromDate", fromDateParam);
+          const url = `${backendUrl}/api/transactions?${params.toString()}`;
+          console.log("url: " + url);
+          const resp = await fetch(url, {
+            method: "GET",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${uuid}`,
+            },
+          });
+          if (!resp.ok) {
+            const errorData = await resp.json().catch(() => ({}));
+            throw new HttpException(
+              errorData.error || `Backend API error for ${acc}`,
+              resp.status
+            );
+          }
+          const json = await resp.json();
+          return json;
+        })
+      );
 
-      result.data = (result.data ?? []).map((tx: any) => ({
+      // รวมผลลัพธ์และ map ฟิลด์
+      const combinedRaw = perAccountResponses.flatMap((r: any) => r.data ?? []);
+
+      const combinedMapped = combinedRaw.map((tx: any) => ({
+        id: tx.id,
         creditType: tx.creditType,
         amount: tx.amount,
         currency: tx.currency,
@@ -107,47 +119,52 @@ export class TransactionsService {
         toBankCode: tx.toBankCode,
         toBankAccountNumber: tx.toBankAccountNumber,
         remarks: tx.remarks,
-        transactionTimestamp: tx.transactionTimestampV2,
+        transactionTimestamp: tx.transferDateTimeV2,
       }));
 
-      // หาค่า transactionTimestamp ล่าสุดจาก data
-      if (result.data && result.data.length > 0) {
-        const latestTimestamp = result.data
+      // คำนวณเวลาล่าสุดรวม
+      const latestTimestampOverall =
+        combinedMapped
           .map((tx: any) => tx.transactionTimestamp)
-          .filter(Boolean) // กรองค่า null/undefined ออก
+          .filter(Boolean)
           .sort(
             (a: string, b: string) =>
               new Date(b).getTime() - new Date(a).getTime()
-          )[0]; // เรียงจากใหม่ไปเก่า แล้วเอาตัวแรก
+          )[0] || null;
 
-        result.transactionTimestamp = latestTimestamp;
-
-        // Update transactionCursor ด้วยเวลาล่าสุด
-        if (latestTimestamp) {
-          // ใช้ findFirst และ updateMany แทน upsert เพราะมี compound unique constraint
-          const existingCursor = await prisma.transactionCursor.findFirst({
-            where: { tokenUuid: uuid },
-          });
-
-          if (existingCursor) {
-            await prisma.transactionCursor.update({
-              where: { id: existingCursor.id },
-              data: { lastSeenAt: new Date(latestTimestamp) },
-            });
-          } else {
-            await prisma.transactionCursor.create({
-              data: {
-                tokenUuid: uuid,
-                lastSeenAt: new Date(latestTimestamp),
-                from_bank_account_number: queryData.fromBankAccountNumber ?? "",
-              },
-            });
-          }
+      // อัปเดต cursor ต่อบัญชีจากผลรวม
+      const latestByAccount = new Map<string, string>();
+      for (const tx of combinedMapped) {
+        const acc = tx.toBankAccountNumber as string | undefined;
+        const ts = tx.transactionTimestamp as string | undefined;
+        if (!acc || !ts) continue;
+        const prev = latestByAccount.get(acc);
+        if (!prev || new Date(ts).getTime() > new Date(prev).getTime()) {
+          latestByAccount.set(acc, ts);
         }
       }
+      for (const [acc, ts] of latestByAccount) {
+        await prisma.transactionCursor.upsert({
+          where: {
+            tokenUuid_from_bank_account_number: {
+              tokenUuid: uuid,
+              from_bank_account_number: acc,
+            },
+          },
+          update: { lastSeenAt: new Date(ts) },
+          create: {
+            tokenUuid: uuid,
+            from_bank_account_number: acc,
+            lastSeenAt: new Date(ts),
+          },
+        });
+      }
 
-      // ส่งคืนเฉพาะข้อมูลธุรกรรมที่ผ่านการ map แล้วเท่านั้น
-      return result;
+      return {
+        success: true,
+        transactionTimestamp: latestTimestampOverall,
+        data: combinedMapped,
+      };
     } catch (error) {
       console.error("Process get transactions error:", error);
       console.error("Error details:", {
@@ -156,18 +173,26 @@ export class TransactionsService {
         cause: error.cause,
       });
 
-      // บันทึก error log (console.log แทน database)
-      console.log("Transaction Error Log:", {
-        targetDomain: "unknown",
-        endpoint: "/api/transactions",
-        method: "GET",
-        requestQuery: queryData,
-        responseBody: JSON.stringify({ error: error.message }),
-        statusCode: error.status || 500,
-        isSuccess: false,
-      });
-
       throw error;
     }
+  }
+
+  async updateAllTransactionCursors(lastSeenAt: string, uuid: string) {
+    const parsedDate = new Date(lastSeenAt);
+
+    const result = await prisma.transactionCursor.updateMany({
+      where: {
+        tokenUuid: uuid,
+      },
+      data: {
+        lastSeenAt: parsedDate,
+      },
+    });
+
+    return {
+      success: true,
+      message: `Updated ${result.count} transaction cursors for token ${uuid}`,
+      updatedCount: result.count,
+    };
   }
 }
