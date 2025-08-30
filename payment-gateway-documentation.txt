@@ -1,0 +1,265 @@
+================================================================================
+                    PAYMENT GATEWAY SYSTEM DOCUMENTATION
+================================================================================
+
+วันที่: 30 สิงหาคม 2025
+เวอร์ชัน: 1.0
+สถานะ: กำลังพัฒนา
+
+================================================================================
+                                สรุประบบ
+================================================================================
+
+ระบบ Payment Gateway สำหรับ bank-adapter ที่รองรับ BIB-Pay และ Easy-Pay
+โดยใช้ Strategy Pattern Design Pattern
+
+================================================================================
+                                สถาปัตยกรรม
+================================================================================
+
+CAS → bank-adapter → Payment Gateway Service
+                    ├── BIB-Pay Service (Deposit + Withdraw)
+                    └── Easy-Pay Service (Deposit + Withdraw)
+
+================================================================================
+                                FLOW การทำงาน
+================================================================================
+
+1. DEPOSIT FLOW
+   CAS → bank-adapter → Payment Gateway → BIB-Pay/Easy-Pay
+   ↓
+   Payment Gateway → Webhook → bank-adapter → CAS (callbackUrl)
+
+2. WITHDRAW FLOW
+   CAS → bank-adapter → Payment Gateway → BIB-Pay/Easy-Pay
+   ↓
+   Payment Gateway → Webhook → bank-adapter → CAS (callbackUrl)
+
+================================================================================
+                                API SPECIFICATIONS
+================================================================================
+
+1. CREATE DEPOSIT
+   Endpoint: POST /api/create-deposit
+   Payload:
+   {
+     "accountName": "string",      // ชื่อบัญชี
+     "bankNumber": "string",       // เลขบัญชี
+     "bankCode": "string",         // รหัสธนาคาร
+     "refCode": "string",          // รหัสอ้างอิง (transaction_id)
+     "amount": "number",           // จำนวนเงิน
+     "callbackUrl": "string",      // URL สำหรับ callback
+     "gatewayType": "string"       // 'bibpay' หรือ 'easypay'
+   }
+
+2. CREATE WITHDRAW
+   Endpoint: POST /api/create-withdraw
+   Payload: (เหมือน deposit)
+
+3. WEBHOOK ENDPOINTS
+   POST /api/webhooks/bibpay
+   POST /api/webhooks/easypay
+
+================================================================================
+                                PAYMENT GATEWAYS
+================================================================================
+
+1. BIB-PAY
+   - Base URL: https://bibpay-api-wahja.ondigitalocean.app
+   - Authentication: API Key (x-api-key)
+   - Deposit: POST /api/v1/mc/payin
+   - Withdraw: POST /api/v1/mc/payout
+   - Balance: POST /api/v1/mc/balance
+   - Banks: POST /api/v1/mc/bank
+
+2. EASY-PAY
+   - Base URL: https://api.bibbyx.com
+   - Authentication: Bearer Token
+   - Deposit: POST /api/v1/cs/deposit
+   - Withdraw: POST /api/v1/cs/withdraw
+   - ไม่มี Balance และ Banks API
+
+================================================================================
+                                DATABASE SCHEMA
+================================================================================
+
+1. PAYMENT_DEPOSITS
+   - id: UUID (Primary Key)
+   - ref_code: VARCHAR(100) UNIQUE NOT NULL
+   - amount: DECIMAL(15,2) NOT NULL
+   - deposit_amount: DECIMAL(15,2) NOT NULL
+   - account_name: VARCHAR(100) NOT NULL
+   - bank_number: VARCHAR(50) NOT NULL
+   - bank_code: VARCHAR(10) NOT NULL
+   - callback_url: TEXT NOT NULL
+   - signature: VARCHAR(255)
+   - api_key: VARCHAR(255)
+   - gateway_type: VARCHAR(20) NOT NULL
+   - status: VARCHAR(20) DEFAULT 'pending'
+   - qr_code: TEXT
+   - created_at: TIMESTAMP
+   - updated_at: TIMESTAMP
+   - timeout_at: TIMESTAMP
+   - completed_at: TIMESTAMP
+
+2. PAYMENT_WITHDRAWALS
+   - id: UUID (Primary Key)
+   - ref_code: VARCHAR(100) UNIQUE NOT NULL
+   - amount: DECIMAL(15,2) NOT NULL
+   - account_name: VARCHAR(100) NOT NULL
+   - bank_number: VARCHAR(50) NOT NULL
+   - bank_code: VARCHAR(10) NOT NULL
+   - callback_url: TEXT NOT NULL
+   - signature: VARCHAR(255)
+   - api_key: VARCHAR(255)
+   - gateway_type: VARCHAR(20) NOT NULL
+   - status: VARCHAR(20) DEFAULT 'pending'
+   - created_at: TIMESTAMP
+   - updated_at: TIMESTAMP
+   - completed_at: TIMESTAMP
+
+3. PAYMENT_WEBHOOKS
+   - id: UUID (Primary Key)
+   - ref_code: VARCHAR(100) NOT NULL
+   - transaction_type: VARCHAR(20) NOT NULL
+   - gateway_type: VARCHAR(20) NOT NULL
+   - webhook_data: JSONB NOT NULL
+   - status: VARCHAR(20) DEFAULT 'received'
+   - processed_at: TIMESTAMP
+   - created_at: TIMESTAMP
+
+================================================================================
+                                STRATEGY PATTERN
+================================================================================
+
+1. INTERFACE
+   interface IPaymentGateway {
+     createDeposit(payload: CreateDepositPayload): Promise<DepositResponse>;
+     createWithdraw(payload: CreateWithdrawPayload): Promise<WithdrawResponse>;
+     handleWebhook(webhookData: any): Promise<void>;
+   }
+
+2. CONCRETE STRATEGIES
+   - BibPayStrategy: implements IPaymentGateway
+   - EasyPayStrategy: implements IPaymentGateway
+
+3. CONTEXT
+   - PaymentService: ใช้ strategy ที่เลือก
+
+4. FACTORY
+   - PaymentGatewayFactory: สร้าง strategy ตาม type
+
+================================================================================
+                                WEBHOOK CALLBACKS
+================================================================================
+
+1. BIB-PAY CALLBACK (Payin)
+   {
+     "status": "completed",
+     "message": null,
+     "data": {
+       "transactionId": "TRX-BIBBYE-1754223377-7DSoI",
+       "refferend": "trx-001",
+       "amount": "1.00",
+       "bank": {
+         "name": "ธนาคารกรุงไทย",
+         "shortCode": "KTB",
+         "code": "006"
+       },
+       "bnakNumber": "4550292199",
+       "name": "test test",
+       "depositAmount": "1.84"
+     }
+   }
+
+2. BIB-PAY CALLBACK (Payout)
+   {
+     "status": "completed",
+     "message": "ทำรายการสำเร็จ",
+     "data": {
+       "transactionId": "TRX-BIBBYE-1754223657-dqHBG",
+       "refferend": "trx-001",
+       "amount": "2.00",
+       "bank": {
+         "name": "ธนาคารกรุงไทย",
+         "shortCode": "KTB",
+         "code": "006"
+       },
+       "bnakNumber": "4550292199",
+       "name": "test test"
+     }
+   }
+
+================================================================================
+                                STATUS VALUES
+================================================================================
+
+1. DEPOSIT STATUS
+   - "pending": รอยอดเงินเข้า
+   - "completed": สำเร็จ
+   - "timeout": หมดเวลา
+
+2. WITHDRAW STATUS
+   - "pending": รอคิวโอน
+   - "completed": สำเร็จ
+   - "fail": โอนไม่สำเร็จ
+
+================================================================================
+                                ENVIRONMENT VARIABLES
+================================================================================
+
+BIBPAY_API_KEY=your-bibpay-api-key
+EASYPAY_API_KEY=your-easypay-api-key
+DATABASE_URL=postgresql://user:password@host:port/database
+JWT_SECRET=your-jwt-secret
+NODE_ENV=development
+
+================================================================================
+                                โครงสร้างไฟล์
+================================================================================
+
+src/
+├── payment/                    # Payment Module
+│   ├── interfaces/            # Interfaces และ Types
+│   │   └── payment-gateway.interface.ts
+│   ├── strategies/            # Strategy Classes
+│   │   ├── bibpay.strategy.ts
+│   │   └── easypay.strategy.ts
+│   ├── services/              # Services
+│   │   └── payment.service.ts
+│   ├── controllers/           # Controllers
+│   │   ├── payment.controller.ts
+│   │   └── webhook.controller.ts
+│   └── payment.module.ts      # Payment module config
+
+================================================================================
+                                ขั้นตอนการพัฒนา
+================================================================================
+
+Phase 1: ✅ Database Schema (เสร็จแล้ว)
+Phase 2: 🔄 Strategy Pattern Implementation
+Phase 3: ⏳ Services & Controllers
+Phase 4: ⏳ API Endpoints
+Phase 5: ⏳ Webhook Handlers
+Phase 6: ⏳ Testing & Integration
+
+================================================================================
+                                หมายเหตุสำคัญ
+================================================================================
+
+1. ref_code = transaction_id (เป็นตัวเดียวกัน)
+2. Easy-Pay ไม่มี Balance และ Banks API
+3. BIB-Pay ใช้ API Key, Easy-Pay ใช้ Bearer Token
+4. Webhook จะส่งไปยัง CAS ที่ callbackUrl ที่ได้รับมา
+5. ระบบใช้ Strategy Pattern เพื่อรองรับ Payment Gateway หลายตัว
+
+================================================================================
+                                ติดต่อ
+================================================================================
+
+หากมีคำถามหรือต้องการความช่วยเหลือเพิ่มเติม
+กรุณาติดต่อทีมพัฒนา
+
+================================================================================
+                                จบเอกสาร
+================================================================================
