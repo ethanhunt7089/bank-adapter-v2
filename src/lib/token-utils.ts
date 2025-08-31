@@ -1,49 +1,53 @@
-import { prisma } from './prisma';
+import { prisma } from "./prisma";
 
 /**
  * ดึงข้อมูล target domain จาก token โดยใช้ UUID
  * @param uuid - UUID ของ token
  * @returns target domain หรือ null ถ้าไม่พบ
  */
-export async function getTargetDomainByUuid(uuid: string): Promise<string | null> {
+export async function getTargetDomainByUuid(
+  uuid: string
+): Promise<string | null> {
   try {
     const token = await prisma.token.findFirst({
       where: {
-        uuid: uuid
+        uuid: uuid,
       },
       select: {
         targetDomain: true,
-        isActive: true
-      }
+        isActive: true,
+      },
     });
 
     if (!token) {
-      console.log(`❌ Token not found for UUID: ${uuid}`);
+      //console.log(`❌ Token not found for UUID: ${uuid}`);
       return null;
     }
 
     if (!token.isActive) {
-      console.log(`❌ Token is inactive for UUID: ${uuid}`);
+      //console.log(`❌ Token is inactive for UUID: ${uuid}`);
       return null;
     }
 
-    console.log(`✅ Found target domain: ${token.targetDomain} for UUID: ${uuid}`);
+    //console.log(`✅ Found target domain: ${token.targetDomain} for UUID: ${uuid}`);
     return token.targetDomain;
   } catch (error) {
     console.error(`❌ Error getting target domain for UUID ${uuid}:`, error);
     return null;
   }
 }
- 
+
 /**
  * ดึง target domain และ tokenHash โดยใช้ UUID
  * ใช้สำหรับเรียก backend ที่ยังต้องการ Bearer token เดิม
  */
-export async function getTargetDomainAndTokenByUuid(uuid: string): Promise<{ targetDomain: string; tokenHash: string } | null> {
+export async function getTargetDomainAndTokenByUuid(
+  uuid: string
+): Promise<{ targetDomain: string; tokenHash: string } | null> {
   try {
     const token = await prisma.token.findFirst({
       where: { uuid },
-      select: { targetDomain: true, tokenHash: true, isActive: true }
+      select: { targetDomain: true, tokenHash: true, isActive: true },
     });
 
     if (!token || !token.isActive || !token.tokenHash) {
@@ -66,8 +70,8 @@ export async function getTokenByUuid(uuid: string) {
   try {
     const token = await prisma.token.findFirst({
       where: {
-        uuid: uuid
-      }
+        uuid: uuid,
+      },
     });
 
     if (!token) {
@@ -92,11 +96,11 @@ export async function isTokenValid(uuid: string): Promise<boolean> {
   try {
     const token = await prisma.token.findFirst({
       where: {
-        uuid: uuid
+        uuid: uuid,
       },
       select: {
-        isActive: true
-      }
+        isActive: true,
+      },
     });
 
     return token?.isActive ?? false;
@@ -114,8 +118,8 @@ export async function getAllTokens() {
   try {
     const tokens = await prisma.token.findMany({
       orderBy: {
-        createdAt: 'desc'
-      }
+        createdAt: "desc",
+      },
     });
 
     console.log(`✅ Found ${tokens.length} tokens`);
@@ -125,4 +129,3 @@ export async function getAllTokens() {
     return [];
   }
 }
-

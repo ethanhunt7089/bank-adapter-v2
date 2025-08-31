@@ -61,7 +61,7 @@ export class TransactionsService {
             })
             .catch(() => [])
         : [];
-      console.log("cursorsAll: " + JSON.stringify(cursorsAll!));
+      //console.log("cursorsAll: " + JSON.stringify(cursorsAll!));
       const accountToCursor = new Map<string, string>();
       for (const c of cursorsAll)
         accountToCursor.set(c.from_bank_account_number, c.lastSeenAt);
@@ -70,12 +70,7 @@ export class TransactionsService {
       const perAccountResponses = await Promise.all(
         accountList.map(async (acc) => {
           const lastSeen = accountToCursor.get(acc);
-          console.log(
-            "lastSeenlastSeenlastSeenlastSeenlastSeenlastSeen: " + lastSeen
-          );
-          console.log(
-            "lastSeenlastSeenlastSeenlastSeenlastSeenlastSeen: " + lastSeen
-          );
+
           // แก้ไขตรงนี้: ไม่ต้องบวก 1 วินาที
           const fromDateParam = lastSeen ? formatDateTime(lastSeen) : "0";
 
@@ -83,7 +78,6 @@ export class TransactionsService {
           params.append("accountNumber", acc);
           params.append("fromDate", fromDateParam);
           const url = `${backendUrl}/api/transactions?${params.toString()}`;
-          console.log("url: " + url);
           const resp = await fetch(url, {
             method: "GET",
             headers: {

@@ -33,12 +33,12 @@ export class BibPayStrategy implements IPaymentGateway {
   ): Promise<DepositResponse> {
     try {
       const bibpayPayload = {
-        accountName: payload.accountName,
+        bankName: payload.accountName, // เปลี่ยนจาก accountName เป็น bankName
         bankNumber: payload.bankNumber,
         bankCode: payload.bankCode,
-        refCode: payload.refCode,
-        amount: payload.amount.toString(),
         callbackUrl: payload.callbackUrl,
+        refferend: payload.refCode, // เปลี่ยนจาก refCode เป็น refferend
+        amount: payload.amount.toString(),
       };
 
       // สร้าง signature สำหรับ BIB-Pay
@@ -121,12 +121,12 @@ export class BibPayStrategy implements IPaymentGateway {
   ): Promise<WithdrawResponse> {
     try {
       const bibpayPayload = {
-        accountName: payload.accountName,
+        bankName: payload.accountName, // เปลี่ยนจาก accountName เป็น bankName
         bankNumber: payload.bankNumber,
         bankCode: payload.bankCode,
-        refCode: payload.refCode,
-        amount: payload.amount.toString(),
         callbackUrl: payload.callbackUrl,
+        refferend: payload.refCode, // เปลี่ยนจาก refCode เป็น refferend
+        amount: payload.amount.toString(),
       };
 
       // สร้าง signature สำหรับ BIB-Pay
