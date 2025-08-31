@@ -163,7 +163,7 @@ export class PaymentService {
       }
 
       // Check if withdraw already exists
-      const existingWithdraw = await prisma.payment_withdrawals.findUnique({
+      const existingWithdraw = await prisma.payment_withdraw.findUnique({
         where: { ref_code: payload.refCode },
       });
 
@@ -174,7 +174,7 @@ export class PaymentService {
       }
 
       // Create withdraw record in database
-      const withdrawRecord = await prisma.payment_withdrawals.create({
+      const withdrawRecord = await prisma.payment_withdraw.create({
         data: {
           ref_code: payload.refCode,
           amount: payload.amount,
@@ -199,7 +199,7 @@ export class PaymentService {
 
       if (gatewayResponse.success) {
         // Update withdraw record
-        await prisma.payment_withdrawals.update({
+        await prisma.payment_withdraw.update({
           where: { id: withdrawRecord.id },
           data: {
             updated_at: new Date(),
@@ -213,7 +213,7 @@ export class PaymentService {
         };
       } else {
         // Update withdraw record with error status
-        await prisma.payment_withdrawals.update({
+        await prisma.payment_withdraw.update({
           where: { id: withdrawRecord.id },
           data: {
             status: PaymentStatus.FAIL,
@@ -289,7 +289,7 @@ export class PaymentService {
   }
 
   async getWithdrawStatus(refCode: string): Promise<any> {
-    return prisma.payment_withdrawals.findUnique({
+    return prisma.payment_withdraw.findUnique({
       where: { ref_code: refCode },
     });
   }

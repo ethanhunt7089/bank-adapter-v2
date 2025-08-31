@@ -184,7 +184,7 @@ export class PaymentService {
       }
 
       // Check if withdraw already exists
-      const existingWithdraw = await prisma.payment_withdrawals.findUnique({
+      const existingWithdraw = await prisma.payment_withdraw.findUnique({
         where: { ref_code: payload.refCode },
       });
 
@@ -195,57 +195,84 @@ export class PaymentService {
         };
       }
 
-      // Create withdraw record in database
-      const withdrawRecord = await prisma.payment_withdrawals.create({
-        data: {
-          ref_code: payload.refCode,
-          amount: payload.amount,
-          account_name: payload.accountName,
-          bank_number: payload.bankNumber,
-          bank_code: payload.bankCode,
-          callback_url: payload.callbackUrl,
-          gateway_type: token.paymentSys,
-          status: PaymentStatus.PENDING,
-          created_at: new Date(),
-          updated_at: new Date(),
-        },
-      });
-
       // Get payment gateway strategy
       const gateway = this.paymentGatewayFactory.createGateway(
         token.paymentSys as GatewayType
       );
 
-      // Call external payment gateway
+      // Log ข้อมูลที่ส่งไป Payment Gateway
+      this.logger.log(`=== Sending to Payment Gateway (Withdraw) ===`);
+      this.logger.log(`Gateway Type: ${token.paymentSys}`);
+      this.logger.log(`Payload: ${JSON.stringify(payload, null, 2)}`);
+      this.logger.log(`Token UUID: ${token.uuid}`);
+      this.logger.log(`Payment Key: ${(token as any).paymentKey || "NOT SET"}`);
+      this.logger.log(`Payment Secret: ${(token as any).paymentSecret}`);
+      this.logger.log(`================================`);
+
+      // Call external payment gateway ก่อน
       const gatewayResponse = await gateway.createWithdraw(payload, token);
 
+      // Log response จาก Payment Gateway
+      this.logger.log(`=== Payment Gateway Response (Withdraw) ===`);
+      this.logger.log(`Response: ${JSON.stringify(gatewayResponse, null, 2)}`);
+      this.logger.log(`Success: ${gatewayResponse.success}`);
+      this.logger.log(`Message: ${gatewayResponse.message}`);
+      this.logger.log(
+        `Transaction ID: ${gatewayResponse.transactionId || "N/A"}`
+      );
+      this.logger.log(`================================`);
+
       if (gatewayResponse.success) {
-        // Update withdraw record
-        await prisma.payment_withdrawals.update({
-          where: { id: withdrawRecord.id },
+        // ถ้า gateway success แล้วค่อยสร้าง record ใน database
+        this.logger.log(`=== Creating Database Record (Withdraw) ===`);
+        this.logger.log(`Ref Code: ${payload.refCode}`);
+        this.logger.log(`Amount: ${payload.amount}`);
+        this.logger.log(`Account Name: ${payload.accountName}`);
+        this.logger.log(`Bank Number: ${payload.bankNumber}`);
+        this.logger.log(`Bank Code: ${payload.bankCode}`);
+        this.logger.log(
+          `Gateway Transaction ID: ${gatewayResponse.transactionId || "N/A"}`
+        );
+        this.logger.log(`================================`);
+
+        const withdrawRecord = await prisma.payment_withdraw.create({
           data: {
+            ref_code: payload.refCode,
+            amount: payload.amount,
+            account_name: payload.accountName,
+            bank_number: payload.bankNumber,
+            bank_code: payload.bankCode,
+            callback_url: payload.callbackUrl,
+            gateway_type: token.paymentSys,
+            status: PaymentStatus.PENDING,
+            gateway_transaction_id: gatewayResponse.transactionId,
+            gateway_response: gatewayResponse.gatewayResponse,
+            created_at: new Date(),
             updated_at: new Date(),
           },
         });
 
+        this.logger.log(`=== Database Record Created (Withdraw) ===`);
+        this.logger.log(`Record ID: ${withdrawRecord.id}`);
+        this.logger.log(`Status: ${withdrawRecord.status}`);
+        this.logger.log(`Created At: ${withdrawRecord.created_at}`);
+        this.logger.log(`================================`);
         this.logger.log(`Withdraw created successfully for ${payload.refCode}`);
         return {
           success: true,
-          message: "",
+          message: `Withdraw created successfully. Amount: ${payload.amount} THB. Transaction ID: ${gatewayResponse.transactionId || "N/A"}`,
+          transactionId: gatewayResponse.transactionId,
         };
       } else {
-        // Update withdraw record with error status
-        await prisma.payment_withdrawals.update({
-          where: { id: withdrawRecord.id },
-          data: {
-            status: PaymentStatus.FAIL,
-            updated_at: new Date(),
-          },
-        });
-
+        // ถ้า gateway fail ไม่ต้องสร้าง record ใน database
+        this.logger.error(`=== Payment Gateway Failed (Withdraw) ===`);
+        this.logger.error(`Ref Code: ${payload.refCode}`);
+        this.logger.error(`Error Message: ${gatewayResponse.message}`);
         this.logger.error(
-          `Failed to create withdraw for ${payload.refCode}: ${gatewayResponse.message}`
+          `Gateway Response: ${JSON.stringify(gatewayResponse, null, 2)}`
         );
+        this.logger.error(`================================`);
+
         return {
           success: false,
           message: gatewayResponse.message,
@@ -285,7 +312,7 @@ export class PaymentService {
       const depositRecord = await prisma.payment_deposits.findFirst({
         where: { ref_code: refCode },
       });
-      const withdrawRecord = await prisma.payment_withdrawals.findFirst({
+      const withdrawRecord = await prisma.payment_withdraw.findFirst({
         where: { ref_code: refCode },
       });
 
@@ -380,6 +407,33 @@ export class PaymentService {
         }
       }
 
+      // อัพเดท withdraw status ถ้าเป็น withdraw webhook
+      if (
+        webhookData.transactionType === "withdraw" &&
+        webhookData.data?.status === "completed"
+      ) {
+        try {
+          await prisma.payment_withdraw.updateMany({
+            where: {
+              ref_code: webhookData.refCode,
+              gateway_type: webhookData.gatewayType,
+            },
+            data: {
+              status: "completed",
+              updated_at: new Date(),
+              completed_at: new Date(),
+            },
+          });
+          this.logger.log(
+            `Withdraw ${webhookData.refCode} marked as completed`
+          );
+        } catch (updateError) {
+          this.logger.warn(
+            `Could not update withdraw status for ${webhookData.refCode}: ${updateError.message}`
+          );
+        }
+      }
+
       // Get payment gateway strategy
       const gateway = this.paymentGatewayFactory.createGateway(
         webhookData.gatewayType as GatewayType
@@ -416,7 +470,7 @@ export class PaymentService {
   }
 
   async getWithdrawStatus(refCode: string): Promise<any> {
-    return prisma.payment_withdrawals.findUnique({
+    return prisma.payment_withdraw.findUnique({
       where: { ref_code: refCode },
     });
   }
