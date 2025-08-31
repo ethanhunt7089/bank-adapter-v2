@@ -426,7 +426,12 @@ export class PaymentService {
           webhookData.data?.data?.status === "success" ||
           webhookData.data?.data?.status === true ||
           webhookData.data?.data?.status === "paid" ||
-          webhookData.data?.data?.status === "confirmed")
+          webhookData.data?.data?.status === "confirmed" ||
+          webhookData.data?.status === "completed" ||
+          webhookData.data?.status === "success" ||
+          webhookData.data?.status === true ||
+          webhookData.data?.status === "paid" ||
+          webhookData.data?.status === "confirmed")
       ) {
         try {
           await prisma.payment_deposits.updateMany({
@@ -464,7 +469,12 @@ export class PaymentService {
           webhookData.data?.status === "success" ||
           webhookData.data?.status === true ||
           webhookData.data?.status === "paid" ||
-          webhookData.data?.status === "confirmed")
+          webhookData.data?.status === "confirmed" ||
+          webhookData.data?.data?.status === "completed" || // เพิ่มเพื่อรองรับ nested structure
+          webhookData.data?.data?.status === "success" ||
+          webhookData.data?.data?.status === true ||
+          webhookData.data?.data?.status === "paid" ||
+          webhookData.data?.data?.status === "confirmed")
       ) {
         try {
           await prisma.payment_withdraw.updateMany({
