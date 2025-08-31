@@ -112,4 +112,22 @@ export class WebhookController {
       return { success: false, message: error.message };
     }
   }
+
+  // Endpoint ใหม่สำหรับทดสอบ webhook
+  @Post("webhooks/test-webhook")
+  async handleTestWebhook(
+    @Body() webhookData: any
+  ): Promise<{ message: string; received: any }> {
+    this.logger.log(`=== TEST WEBHOOK RECEIVED ===`);
+    this.logger.log(`Timestamp: ${new Date().toISOString()}`);
+    this.logger.log(`Raw Data: ${JSON.stringify(webhookData, null, 2)}`);
+    this.logger.log(`Data Type: ${typeof webhookData}`);
+    this.logger.log(`Data Keys: ${Object.keys(webhookData || {}).join(", ")}`);
+    this.logger.log(`=== END TEST WEBHOOK ===`);
+
+    return {
+      message: "Test webhook received and logged successfully",
+      received: webhookData,
+    };
+  }
 }

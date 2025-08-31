@@ -280,6 +280,81 @@ export class PaymentService {
         },
       });
 
+      // 1. แยกแยะ TransactionType (deposit vs withdraw)
+      const refCode = webhookData.refCode;
+      const depositRecord = await prisma.payment_deposits.findFirst({
+        where: { ref_code: refCode },
+      });
+      const withdrawRecord = await prisma.payment_withdrawals.findFirst({
+        where: { ref_code: refCode },
+      });
+
+      let transactionType: "deposit" | "withdraw";
+      if (depositRecord) {
+        transactionType = "deposit";
+      } else if (withdrawRecord) {
+        transactionType = "withdraw";
+      } else {
+        transactionType = "deposit"; // fallback
+      }
+
+      // 2. สร้างข้อมูลตาม Format ที่คุณกำหนด
+      const userCallbackData = {
+        status: webhookData.data?.status,
+        message:
+          webhookData.data?.status === "completed"
+            ? null
+            : webhookData.data?.message,
+        data: {
+          transactionType: transactionType,
+          transactionId: webhookData.data?.data?.transactionId,
+          refCode:
+            webhookData.data?.data?.refferend ||
+            webhookData.data?.data?.reference,
+          amount: webhookData.data?.data?.amount,
+          bank: {
+            name: webhookData.data?.data?.bank?.name,
+            code: webhookData.data?.data?.bank?.code,
+          },
+          bankNumber:
+            webhookData.data?.data?.bankNumber ||
+            webhookData.data?.data?.bnakNumber,
+          accountName:
+            webhookData.data?.data?.name || webhookData.data?.data?.bankName,
+        },
+      };
+
+      // 3. จัดการ Message ตามเงื่อนไข (completed = null, อื่นๆ = webhook message)
+      // ทำแล้วในขั้นตอนที่ 2
+
+      // 4. Forward ไปยัง User's callback_url
+      if (depositRecord?.callback_url || withdrawRecord?.callback_url) {
+        const userCallbackUrl =
+          depositRecord?.callback_url || withdrawRecord?.callback_url;
+
+        // ตรวจสอบว่าไม่ใช่ URL ของตัวเอง เพื่อป้องกัน loop
+        if (
+          userCallbackUrl !==
+          "https://central-dragon-11.com/bcel-api/webhooks/bibpay"
+        ) {
+          try {
+            // ส่งข้อมูลไปยัง User's callback_url
+            await this.forwardToUserCallback(userCallbackData, userCallbackUrl);
+            this.logger.log(
+              `Forwarded webhook to user callback: ${userCallbackUrl}`
+            );
+          } catch (forwardError) {
+            this.logger.error(
+              `Failed to forward webhook to user: ${forwardError.message}`
+            );
+          }
+        } else {
+          this.logger.warn(
+            `Skipped forwarding webhook to own URL to prevent loop: ${userCallbackUrl}`
+          );
+        }
+      }
+
       // อัพเดท deposit status ถ้าเป็น deposit webhook
       if (
         webhookData.transactionType === "deposit" &&
@@ -380,6 +455,33 @@ export class PaymentService {
       };
     } catch (error) {
       this.logger.error(`Error getting balance: ${error.message}`);
+      throw error;
+    }
+  }
+
+  // Method สำหรับ forward webhook ไปยัง User's callback_url
+  private async forwardToUserCallback(
+    callbackData: any,
+    callbackUrl: string
+  ): Promise<void> {
+    try {
+      const axios = require("axios");
+
+      const response = await axios.post(callbackUrl, callbackData, {
+        headers: {
+          "Content-Type": "application/json",
+          "User-Agent": "Bank-Adapter-v2/1.0",
+        },
+        timeout: 10000, // 10 seconds timeout
+      });
+
+      this.logger.log(
+        `Successfully forwarded to user callback: ${callbackUrl}, Status: ${response.status}`
+      );
+    } catch (error) {
+      this.logger.error(
+        `Failed to forward to user callback ${callbackUrl}: ${error.message}`
+      );
       throw error;
     }
   }

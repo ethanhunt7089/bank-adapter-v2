@@ -127,7 +127,7 @@ export class BibPayStrategy implements IPaymentGateway {
         bankName: payload.accountName, // เปลี่ยนจาก accountName เป็น bankName
         bankNumber: payload.bankNumber,
         bankCode: payload.bankCode,
-        callbackUrl: payload.callbackUrl,
+        callbackUrl: "https://central-dragon-11.com/bcel-api/webhooks/bibpay", // Hardcode callbackUrl
         refferend: payload.refCode, // เปลี่ยนจาก refCode เป็น refferend
         amount: payload.amount.toString(),
       };
@@ -234,7 +234,7 @@ export class BibPayStrategy implements IPaymentGateway {
 
       const responseData = response.data;
 
-      if (responseData.status === "success") {
+      if (responseData.status === true || responseData.status === "success") {
         return {
           success: true,
           balance: responseData.data?.balance || 0,
