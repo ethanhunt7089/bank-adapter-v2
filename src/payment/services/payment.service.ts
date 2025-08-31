@@ -105,6 +105,8 @@ export class PaymentService {
             gateway_type: token.paymentSys,
             status: PaymentStatus.PENDING,
             qr_code: gatewayResponse.qrcodeUrl,
+            gateway_transaction_id: gatewayResponse.transactionId,
+            gateway_response: gatewayResponse.gatewayResponse,
             created_at: new Date(),
             updated_at: new Date(),
           },
@@ -277,6 +279,31 @@ export class PaymentService {
           created_at: new Date(),
         },
       });
+
+      // อัพเดท deposit status ถ้าเป็น deposit webhook
+      if (
+        webhookData.transactionType === "deposit" &&
+        webhookData.data?.status === "completed"
+      ) {
+        try {
+          await prisma.payment_deposits.updateMany({
+            where: {
+              ref_code: webhookData.refCode,
+              gateway_type: webhookData.gatewayType,
+            },
+            data: {
+              status: "completed",
+              updated_at: new Date(),
+              completed_at: new Date(),
+            },
+          });
+          this.logger.log(`Deposit ${webhookData.refCode} marked as completed`);
+        } catch (updateError) {
+          this.logger.warn(
+            `Could not update deposit status for ${webhookData.refCode}: ${updateError.message}`
+          );
+        }
+      }
 
       // Get payment gateway strategy
       const gateway = this.paymentGatewayFactory.createGateway(

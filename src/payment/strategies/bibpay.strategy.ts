@@ -71,9 +71,10 @@ export class BibPayStrategy implements IPaymentGateway {
 
       const responseData = response.data;
 
-      if (responseData.status === "success") {
+      // แก้ไขการเช็ค status - BIB-Pay ส่ง status: true
+      if (responseData.status === true || responseData.status === "success") {
         // แปลง QR Code string เป็น image URL
-        const qrCodeString = responseData.data?.qrCode;
+        const qrCodeString = responseData.data?.qrcode; // ใช้ qrcode ไม่ใช่ qrCode
         const qrCodeUrl = qrCodeString
           ? `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrCodeString)}`
           : undefined;
@@ -81,7 +82,9 @@ export class BibPayStrategy implements IPaymentGateway {
         return {
           success: true,
           qrcodeUrl: qrCodeUrl,
-          message: "Deposit created successfully",
+          message: `Deposit created successfully. Amount: ${responseData.data?.amount || payload.amount} THB. Transaction ID: ${responseData.data?.transactionId || "N/A"}`,
+          transactionId: responseData.data?.transactionId,
+          gatewayResponse: responseData,
         };
       }
 
@@ -159,10 +162,13 @@ export class BibPayStrategy implements IPaymentGateway {
 
       const responseData = response.data;
 
-      if (responseData.status === "success") {
+      // แก้ไขการเช็ค status - BIB-Pay ส่ง status: true
+      if (responseData.status === true || responseData.status === "success") {
         return {
           success: true,
-          message: "",
+          message: `Withdraw created successfully. Amount: ${responseData.data?.amount || payload.amount} THB. Transaction ID: ${responseData.data?.transactionId || "N/A"}`,
+          transactionId: responseData.data?.transactionId,
+          gatewayResponse: responseData,
         };
       }
 

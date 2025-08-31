@@ -38,10 +38,20 @@ export class WebhookController {
     this.logger.log("=== End BIB-Pay Webhook Data ===");
 
     try {
+      // สร้าง refCode จาก webhook data - รองรับหลาย field names
+      const refCode =
+        webhookData.refCode ||
+        webhookData.refferend ||
+        webhookData.reference ||
+        webhookData.data?.refCode ||
+        webhookData.data?.refferend ||
+        webhookData.data?.reference ||
+        `WEBHOOK-${Date.now()}`;
+
       // เรียก PaymentService เพื่อประมวลผล webhook
       await this.paymentService.handleWebhook({
-        refCode: webhookData.refCode || webhookData.refferend,
-        transactionType: webhookData.transactionType || "deposit", // รองรับทั้ง deposit และ withdraw
+        refCode: refCode,
+        transactionType: webhookData.transactionType || "deposit",
         gatewayType: "bibpay",
         data: webhookData,
       });
