@@ -20,7 +20,7 @@ export class CreateWithdrawDto {
 
   @ApiProperty({
     description: "ชื่อเจ้าของบัญชี",
-    example: "ชลภัทร เอื้ออรัญโชติ",
+    example: "John Doe",
   })
   @IsString()
   @IsNotEmpty()

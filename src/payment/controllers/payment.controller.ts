@@ -123,22 +123,20 @@ export class PaymentController {
           qrcodeUrl: result.qrcodeUrl,
         };
       } else {
-        throw new HttpException(
-          result.message || "Failed to create deposit",
-          HttpStatus.BAD_REQUEST
-        );
+        // Return error message จาก PaymentService แทนที่จะ throw HttpException
+        return {
+          success: false,
+          message: result.message || "Failed to create deposit",
+        };
       }
     } catch (error) {
       this.logger.error(`Error creating deposit: ${error.message}`);
 
-      if (error instanceof HttpException) {
-        throw error;
-      }
-
-      throw new HttpException(
-        error.message || "Internal server error",
-        HttpStatus.INTERNAL_SERVER_ERROR
-      );
+      // Return error message แทนที่จะ throw HttpException
+      return {
+        success: false,
+        message: error.message || "Internal server error",
+      };
     }
   }
 

@@ -31,25 +31,35 @@ export class PaymentService {
       });
 
       if (!token) {
-        throw new Error("Invalid token: token not found");
+        return {
+          success: false,
+          message: "Invalid token: token not found",
+        };
       }
 
       if (!token.isActive) {
-        throw new Error("Invalid token: token is inactive");
+        return {
+          success: false,
+          message: "Invalid token: token is inactive",
+        };
       }
 
       // ตรวจสอบว่า token รองรับ payment system ที่ต้องการหรือไม่
       if (!token.paymentSys) {
-        throw new Error(
-          `Token does not support any payment system. Please configure payment_sys first.`
-        );
+        return {
+          success: false,
+          message: `Token does not support any payment system. Please configure payment_sys first.`,
+        };
       }
 
       // Validate gateway type from token
       if (
         !Object.values(GatewayType).includes(token.paymentSys as GatewayType)
       ) {
-        throw new Error(`Invalid payment system in token: ${token.paymentSys}`);
+        return {
+          success: false,
+          message: `Invalid payment system in token: ${token.paymentSys}`,
+        };
       }
 
       // Check if deposit already exists
@@ -58,42 +68,44 @@ export class PaymentService {
       });
 
       if (existingDeposit) {
-        throw new Error(
-          `Deposit with ref_code ${payload.refCode} already exists`
-        );
+        return {
+          success: false,
+          message: `Deposit with ref_code ${payload.refCode} already exists`,
+        };
       }
-
-      // Create deposit record in database
-      const depositRecord = await prisma.payment_deposits.create({
-        data: {
-          ref_code: payload.refCode,
-          amount: payload.amount,
-          deposit_amount: payload.amount,
-          account_name: payload.accountName,
-          bank_number: payload.bankNumber,
-          bank_code: payload.bankCode,
-          callback_url: payload.callbackUrl,
-          gateway_type: token.paymentSys,
-          status: PaymentStatus.PENDING,
-          created_at: new Date(),
-          updated_at: new Date(),
-        },
-      });
 
       // Get payment gateway strategy
       const gateway = this.paymentGatewayFactory.createGateway(
         token.paymentSys as GatewayType
       );
 
-      // Call external payment gateway
+      // Log ข้อมูลที่ส่งไป Payment Gateway
+      this.logger.log(`=== Sending to Payment Gateway ===`);
+      this.logger.log(`Gateway Type: ${token.paymentSys}`);
+      this.logger.log(`Payload: ${JSON.stringify(payload, null, 2)}`);
+      this.logger.log(`Token UUID: ${token.uuid}`);
+      this.logger.log(`Payment Key: ${(token as any).paymentKey || "NOT SET"}`);
+      this.logger.log(`Payment Secret: ${(token as any).paymentSecret}`);
+      this.logger.log(`================================`);
+
+      // Call external payment gateway ก่อน
       const gatewayResponse = await gateway.createDeposit(payload, token);
 
       if (gatewayResponse.success) {
-        // Update deposit record with QR code
-        await prisma.payment_deposits.update({
-          where: { id: depositRecord.id },
+        // สร้าง record ใน database เมื่อ Payment Gateway success
+        const depositRecord = await prisma.payment_deposits.create({
           data: {
+            ref_code: payload.refCode,
+            amount: payload.amount,
+            deposit_amount: payload.amount,
+            account_name: payload.accountName,
+            bank_number: payload.bankNumber,
+            bank_code: payload.bankCode,
+            callback_url: payload.callbackUrl,
+            gateway_type: token.paymentSys,
+            status: PaymentStatus.PENDING,
             qr_code: gatewayResponse.qrcodeUrl,
+            created_at: new Date(),
             updated_at: new Date(),
           },
         });
@@ -105,15 +117,7 @@ export class PaymentService {
           qrcodeUrl: gatewayResponse.qrcodeUrl,
         };
       } else {
-        // Update deposit record with error status
-        await prisma.payment_deposits.update({
-          where: { id: depositRecord.id },
-          data: {
-            status: PaymentStatus.FAIL,
-            updated_at: new Date(),
-          },
-        });
-
+        // ไม่สร้าง record ถ้า Payment Gateway fail
         this.logger.error(
           `Failed to create deposit for ${payload.refCode}: ${gatewayResponse.message}`
         );
@@ -124,7 +128,12 @@ export class PaymentService {
       }
     } catch (error) {
       this.logger.error(`Error creating deposit: ${error.message}`);
-      throw error;
+
+      // Return error message จาก Payment Gateway แทนที่จะ throw error
+      return {
+        success: false,
+        message: error.message || "Internal server error",
+      };
     }
   }
 
@@ -141,25 +150,35 @@ export class PaymentService {
       });
 
       if (!token) {
-        throw new Error("Invalid token: token not found");
+        return {
+          success: false,
+          message: "Invalid token: token not found",
+        };
       }
 
       if (!token.isActive) {
-        throw new Error("Invalid token: token is inactive");
+        return {
+          success: false,
+          message: "Invalid token: token is inactive",
+        };
       }
 
       // ตรวจสอบว่า token รองรับ payment system ที่ต้องการหรือไม่
       if (!token.paymentSys) {
-        throw new Error(
-          `Token does not support any payment system. Please configure payment_sys first.`
-        );
+        return {
+          success: false,
+          message: `Token does not support any payment system. Please configure payment_sys first.`,
+        };
       }
 
       // Validate gateway type from token
       if (
         !Object.values(GatewayType).includes(token.paymentSys as GatewayType)
       ) {
-        throw new Error(`Invalid payment system in token: ${token.paymentSys}`);
+        return {
+          success: false,
+          message: `Invalid payment system in token: ${token.paymentSys}`,
+        };
       }
 
       // Check if withdraw already exists
@@ -168,9 +187,10 @@ export class PaymentService {
       });
 
       if (existingWithdraw) {
-        throw new Error(
-          `Withdraw with ref_code ${payload.refCode} already exists`
-        );
+        return {
+          success: false,
+          message: `Withdraw with ref_code ${payload.refCode} already exists`,
+        };
       }
 
       // Create withdraw record in database
@@ -231,7 +251,12 @@ export class PaymentService {
       }
     } catch (error) {
       this.logger.error(`Error creating withdraw: ${error.message}`);
-      throw error;
+
+      // Return error message แทนที่จะ throw error
+      return {
+        success: false,
+        message: error.message || "Internal server error",
+      };
     }
   }
 
@@ -278,7 +303,7 @@ export class PaymentService {
       );
     } catch (error) {
       this.logger.error(`Error processing webhook: ${error.message}`);
-      throw error;
+      // ไม่ throw error เพราะ return type เป็น void
     }
   }
 

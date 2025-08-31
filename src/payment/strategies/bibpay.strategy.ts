@@ -44,13 +44,26 @@ export class BibPayStrategy implements IPaymentGateway {
       // สร้าง signature สำหรับ BIB-Pay
       const signature = this.generateSignature(bibpayPayload, token);
 
+      // เพิ่ม signature เข้าไปใน payload
+      (bibpayPayload as any).signatrure = signature;
+
+      // Log ข้อมูลที่ส่งไป BIB-Pay API
+      console.log(`=== Sending to BIB-Pay API (Deposit) ===`);
+      console.log(`URL: ${this.baseUrl}/api/v1/mc/payin`);
+      console.log(`Payload:`, JSON.stringify(bibpayPayload, null, 2));
+      console.log(`Headers:`, {
+        "x-api-key": this.getApiKey(token),
+        "Content-Type": "application/json",
+      });
+      console.log(`Signature: ${signature}`);
+      console.log(`================================`);
+
       const response = await axios.post(
         `${this.baseUrl}/api/v1/mc/payin`,
         bibpayPayload,
         {
           headers: {
             "x-api-key": this.getApiKey(token),
-            "x-signature": signature,
             "Content-Type": "application/json",
           },
         }
@@ -77,9 +90,27 @@ export class BibPayStrategy implements IPaymentGateway {
         message: responseData.message || "Failed to create deposit",
       };
     } catch (error) {
+      // Log error response จาก BIB-Pay API
+      if (error.response) {
+        console.log(`=== BIB-Pay API Error Response (Deposit) ===`);
+        console.log(`Status: ${error.response.status}`);
+        console.log(`Data:`, JSON.stringify(error.response.data, null, 2));
+        console.log(`Headers:`, error.response.headers);
+        console.log(`================================`);
+
+        // ส่ง error message จาก BIB-Pay API กลับไป
+        return {
+          success: false,
+          message:
+            error.response.data?.msg ||
+            error.response.data?.message ||
+            "BIB-Pay API error",
+        };
+      }
+
       return {
         success: false,
-        message: error.message || "Internal server error",
+        message: "Internal server error",
       };
     }
   }
@@ -101,13 +132,26 @@ export class BibPayStrategy implements IPaymentGateway {
       // สร้าง signature สำหรับ BIB-Pay
       const signature = this.generateSignature(bibpayPayload, token);
 
+      // เพิ่ม signature เข้าไปใน payload
+      (bibpayPayload as any).signatrure = signature;
+
+      // Log ข้อมูลที่ส่งไป BIB-Pay API
+      console.log(`=== Sending to BIB-Pay API (Withdraw) ===`);
+      console.log(`URL: ${this.baseUrl}/api/v1/mc/payout`);
+      console.log(`Payload:`, JSON.stringify(bibpayPayload, null, 2));
+      console.log(`Headers:`, {
+        "x-api-key": this.getApiKey(token),
+        "Content-Type": "application/json",
+      });
+      console.log(`Signature: ${signature}`);
+      console.log(`================================`);
+
       const response = await axios.post(
         `${this.baseUrl}/api/v1/mc/payout`,
         bibpayPayload,
         {
           headers: {
             "x-api-key": this.getApiKey(token),
-            "x-signature": signature,
             "Content-Type": "application/json",
           },
         }
@@ -127,6 +171,24 @@ export class BibPayStrategy implements IPaymentGateway {
         message: responseData.message || "Failed to create withdraw",
       };
     } catch (error) {
+      // Log error response จาก BIB-Pay API
+      if (error.response) {
+        console.log(`=== BIB-Pay API Error Response (Withdraw) ===`);
+        console.log(`Status: ${error.response.status}`);
+        console.log(`Data:`, JSON.stringify(error.response.data, null, 2));
+        console.log(`Headers:`, error.response.headers);
+        console.log(`================================`);
+
+        // ส่ง error message จาก BIB-Pay API กลับไป
+        return {
+          success: false,
+          message:
+            error.response.data?.msg ||
+            error.response.data?.message ||
+            error.message,
+        };
+      }
+
       return {
         success: false,
         message: error.message || "Internal server error",
@@ -145,19 +207,10 @@ export class BibPayStrategy implements IPaymentGateway {
   }
 
   private generateSignature(payload: any, token: any): string {
-    // สร้าง signature สำหรับ BIB-Pay
-    // ใช้ HMAC-SHA256 หรือวิธีที่ BIB-Pay ต้องการ
-    const payloadString = JSON.stringify(payload);
-    const secretKey = this.getSecretKey(token);
-
-    // ตัวอย่างการสร้าง signature (ปรับตามที่ BIB-Pay ต้องการ)
-    const crypto = require("crypto");
-    const signature = crypto
-      .createHmac("sha256", secretKey)
-      .update(payloadString)
-      .digest("hex");
-
-    return signature;
+    const jwt = require("jsonwebtoken");
+    const secret = this.getSecretKey(token);
+    const jwtToken = jwt.sign(payload, secret);
+    return jwtToken;
   }
 
   async getBalance(token: any): Promise<any> {
