@@ -83,7 +83,7 @@ export class BibPayStrategy implements IPaymentGateway {
           success: true,
           qrcodeUrl: qrCodeUrl,
           message: `Deposit created successfully. Amount: ${responseData.data?.amount || payload.amount} THB. Transaction ID: ${responseData.data?.transactionId || "N/A"}`,
-          transactionId: responseData.data?.transactionId,
+          paymentTrx: responseData.data?.transactionId,
           gatewayResponse: responseData,
         };
       }
@@ -167,7 +167,7 @@ export class BibPayStrategy implements IPaymentGateway {
         return {
           success: true,
           message: `Withdraw created successfully. Amount: ${responseData.data?.amount || payload.amount} THB. Transaction ID: ${responseData.data?.transactionId || "N/A"}`,
-          transactionId: responseData.data?.transactionId,
+          paymentTrx: responseData.data?.transactionId,
           gatewayResponse: responseData,
         };
       }

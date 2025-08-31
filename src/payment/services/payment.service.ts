@@ -105,7 +105,7 @@ export class PaymentService {
             gateway_type: token.paymentSys,
             status: PaymentStatus.PENDING,
             qr_code: gatewayResponse.qrcodeUrl,
-            gateway_transaction_id: gatewayResponse.transactionId,
+            gateway_transaction_id: gatewayResponse.paymentTrx,
             gateway_response: gatewayResponse.gatewayResponse,
             created_at: new Date(),
             updated_at: new Date(),
@@ -117,6 +117,7 @@ export class PaymentService {
           success: true,
           message: gatewayResponse.message,
           qrcodeUrl: gatewayResponse.qrcodeUrl,
+          paymentTrx: gatewayResponse.paymentTrx,
         };
       } else {
         // ไม่สร้าง record ถ้า Payment Gateway fail
@@ -217,9 +218,11 @@ export class PaymentService {
       this.logger.log(`Response: ${JSON.stringify(gatewayResponse, null, 2)}`);
       this.logger.log(`Success: ${gatewayResponse.success}`);
       this.logger.log(`Message: ${gatewayResponse.message}`);
+      this.logger.log(`Message Type: ${typeof gatewayResponse.message}`);
       this.logger.log(
-        `Transaction ID: ${gatewayResponse.transactionId || "N/A"}`
+        `Message Length: ${gatewayResponse.message?.length || 0}`
       );
+      this.logger.log(`Transaction ID: ${gatewayResponse.paymentTrx || "N/A"}`);
       this.logger.log(`================================`);
 
       if (gatewayResponse.success) {
@@ -231,7 +234,7 @@ export class PaymentService {
         this.logger.log(`Bank Number: ${payload.bankNumber}`);
         this.logger.log(`Bank Code: ${payload.bankCode}`);
         this.logger.log(
-          `Gateway Transaction ID: ${gatewayResponse.transactionId || "N/A"}`
+          `Gateway Transaction ID: ${gatewayResponse.paymentTrx || "N/A"}`
         );
         this.logger.log(`================================`);
 
@@ -245,7 +248,7 @@ export class PaymentService {
             callback_url: payload.callbackUrl,
             gateway_type: token.paymentSys,
             status: PaymentStatus.PENDING,
-            gateway_transaction_id: gatewayResponse.transactionId,
+            gateway_transaction_id: gatewayResponse.paymentTrx,
             gateway_response: gatewayResponse.gatewayResponse,
             created_at: new Date(),
             updated_at: new Date(),
@@ -258,10 +261,17 @@ export class PaymentService {
         this.logger.log(`Created At: ${withdrawRecord.created_at}`);
         this.logger.log(`================================`);
         this.logger.log(`Withdraw created successfully for ${payload.refCode}`);
+        // สร้าง message ที่เหมาะสม
+        let message = gatewayResponse.message;
+        if (!message || message.trim() === "") {
+          message = `Withdraw created successfully. Amount: ${payload.amount} THB. Transaction ID: ${gatewayResponse.paymentTrx || "N/A"}`;
+        }
+
         return {
           success: true,
-          message: `Withdraw created successfully. Amount: ${payload.amount} THB. Transaction ID: ${gatewayResponse.transactionId || "N/A"}`,
-          transactionId: gatewayResponse.transactionId,
+          message: message,
+          paymentTrx: gatewayResponse.paymentTrx,
+          refCode: payload.refCode,
         };
       } else {
         // ถ้า gateway fail ไม่ต้องสร้าง record ใน database
@@ -384,7 +394,7 @@ export class PaymentService {
 
       // อัพเดท deposit status ถ้าเป็น deposit webhook
       if (
-        webhookData.transactionType === "deposit" &&
+        transactionType === "deposit" &&
         webhookData.data?.status === "completed"
       ) {
         try {
@@ -409,7 +419,7 @@ export class PaymentService {
 
       // อัพเดท withdraw status ถ้าเป็น withdraw webhook
       if (
-        webhookData.transactionType === "withdraw" &&
+        transactionType === "withdraw" &&
         webhookData.data?.status === "completed"
       ) {
         try {

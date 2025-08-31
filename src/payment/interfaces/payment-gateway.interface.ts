@@ -20,15 +20,16 @@ export interface DepositResponse {
   success: boolean;
   message?: string;
   qrcodeUrl?: string;
-  transactionId?: string;
+  paymentTrx?: string;
   gatewayResponse?: any;
 }
 
 export interface WithdrawResponse {
   success: boolean;
   message?: string;
-  transactionId?: string;
+  paymentTrx?: string;
   gatewayResponse?: any;
+  refCode?: string; // เพิ่ม refCode
 }
 
 export interface WebhookData {
