@@ -38,20 +38,37 @@ export class WebhookController {
     this.logger.log("=== End BIB-Pay Webhook Data ===");
 
     try {
-      // สร้าง refCode จาก webhook data - รองรับหลาย field names
+      // เอา reference จาก webhookData.data เป็นหลัก
       const refCode =
-        webhookData.refCode ||
-        webhookData.refferend ||
-        webhookData.reference ||
-        webhookData.data?.refCode ||
-        webhookData.data?.refferend ||
         webhookData.data?.reference ||
+        webhookData.data?.refferend ||
+        webhookData.data?.refCode ||
+        webhookData.reference ||
+        webhookData.refferend ||
+        webhookData.refCode ||
         `WEBHOOK-${Date.now()}`;
+
+      // หา transactionType จาก database โดยใช้ refCode
+      let transactionType: "deposit" | "withdraw" | undefined;
+
+      // หาใน payment_deposits
+      const depositRecord =
+        await this.paymentService.findDepositByRefCode(refCode);
+      if (depositRecord) {
+        transactionType = "deposit";
+      } else {
+        // หาใน payment_withdraw
+        const withdrawRecord =
+          await this.paymentService.findWithdrawByRefCode(refCode);
+        if (withdrawRecord) {
+          transactionType = "withdraw";
+        }
+      }
 
       // เรียก PaymentService เพื่อประมวลผล webhook
       await this.paymentService.handleWebhook({
         refCode: refCode,
-        transactionType: webhookData.transactionType || "deposit",
+        transactionType: transactionType, // ส่ง transactionType ที่หาได้จาก database
         gatewayType: "bibpay",
         data: webhookData,
       });
@@ -94,10 +111,37 @@ export class WebhookController {
     this.logger.log("=== End Easy-Pay Webhook Data ===");
 
     try {
+      // เอา reference จาก webhookData.data เป็นหลัก
+      const refCode =
+        webhookData.data?.reference ||
+        webhookData.data?.refferend ||
+        webhookData.data?.refCode ||
+        webhookData.reference ||
+        webhookData.refferend ||
+        webhookData.refCode ||
+        `WEBHOOK-${Date.now()}`;
+
+      // หา transactionType จาก database โดยใช้ refCode
+      let transactionType: "deposit" | "withdraw" | undefined;
+
+      // หาใน payment_deposits
+      const depositRecord =
+        await this.paymentService.findDepositByRefCode(refCode);
+      if (depositRecord) {
+        transactionType = "deposit";
+      } else {
+        // หาใน payment_withdraw
+        const withdrawRecord =
+          await this.paymentService.findWithdrawByRefCode(refCode);
+        if (withdrawRecord) {
+          transactionType = "withdraw";
+        }
+      }
+
       // เรียก PaymentService เพื่อประมวลผล webhook
       await this.paymentService.handleWebhook({
-        refCode: webhookData.refCode,
-        transactionType: webhookData.transactionType || "deposit", // รองรับทั้ง deposit และ withdraw
+        refCode: refCode,
+        transactionType: transactionType, // ส่ง transactionType ที่หาได้จาก database
         gatewayType: "easypay",
         data: webhookData,
       });

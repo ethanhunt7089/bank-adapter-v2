@@ -224,7 +224,9 @@ export class PaymentController {
       if (result.success) {
         return {
           success: true,
-          message: "",
+          message: result.message, // ใช้ message จาก PaymentService
+          paymentTrx: result.paymentTrx, // เพิ่ม paymentTrx
+          refCode: result.refCode, // เพิ่ม refCode
         };
       } else {
         throw new HttpException(

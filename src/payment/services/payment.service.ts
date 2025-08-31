@@ -223,6 +223,10 @@ export class PaymentService {
         `Message Length: ${gatewayResponse.message?.length || 0}`
       );
       this.logger.log(`Transaction ID: ${gatewayResponse.paymentTrx || "N/A"}`);
+      this.logger.log(
+        `Gateway Response Keys: ${Object.keys(gatewayResponse || {})}`
+      );
+      this.logger.log(`Gateway Response Type: ${typeof gatewayResponse}`);
       this.logger.log(`================================`);
 
       if (gatewayResponse.success) {
@@ -263,8 +267,20 @@ export class PaymentService {
         this.logger.log(`Withdraw created successfully for ${payload.refCode}`);
         // สร้าง message ที่เหมาะสม
         let message = gatewayResponse.message;
+
+        // Debug message creation
+        this.logger.log(`=== Message Creation Debug ===`);
+        this.logger.log(`Original message: ${message}`);
+        this.logger.log(`Message type: ${typeof message}`);
+        this.logger.log(`Message length: ${message?.length || 0}`);
+        this.logger.log(
+          `Message is empty: ${!message || message.trim() === ""}`
+        );
+        this.logger.log(`================================`);
+
         if (!message || message.trim() === "") {
           message = `Withdraw created successfully. Amount: ${payload.amount} THB. Transaction ID: ${gatewayResponse.paymentTrx || "N/A"}`;
+          this.logger.log(`Using fallback message: ${message}`);
         }
 
         return {
@@ -392,10 +408,25 @@ export class PaymentService {
         }
       }
 
+      // Debug log สำหรับ deposit status update
+      this.logger.log(`=== Deposit Status Update Debug ===`);
+      this.logger.log(`transactionType: ${transactionType}`);
+      this.logger.log(
+        `webhookData.data?.data?.status: ${webhookData.data?.data?.status}`
+      );
+      this.logger.log(
+        `webhookData.data: ${JSON.stringify(webhookData.data, null, 2)}`
+      );
+      this.logger.log(`================================`);
+
       // อัพเดท deposit status ถ้าเป็น deposit webhook
       if (
         transactionType === "deposit" &&
-        webhookData.data?.status === "completed"
+        (webhookData.data?.data?.status === "completed" ||
+          webhookData.data?.data?.status === "success" ||
+          webhookData.data?.data?.status === true ||
+          webhookData.data?.data?.status === "paid" ||
+          webhookData.data?.data?.status === "confirmed")
       ) {
         try {
           await prisma.payment_deposits.updateMany({
@@ -417,10 +448,23 @@ export class PaymentService {
         }
       }
 
+      // Debug log สำหรับ withdraw status update
+      this.logger.log(`=== Withdraw Status Update Debug ===`);
+      this.logger.log(`transactionType: ${transactionType}`);
+      this.logger.log(`webhookData.data?.status: ${webhookData.data?.status}`);
+      this.logger.log(
+        `webhookData.data: ${JSON.stringify(webhookData.data, null, 2)}`
+      );
+      this.logger.log(`================================`);
+
       // อัพเดท withdraw status ถ้าเป็น withdraw webhook
       if (
         transactionType === "withdraw" &&
-        webhookData.data?.status === "completed"
+        (webhookData.data?.status === "completed" ||
+          webhookData.data?.status === "success" ||
+          webhookData.data?.status === true ||
+          webhookData.data?.status === "paid" ||
+          webhookData.data?.status === "confirmed")
       ) {
         try {
           await prisma.payment_withdraw.updateMany({
@@ -480,6 +524,20 @@ export class PaymentService {
   }
 
   async getWithdrawStatus(refCode: string): Promise<any> {
+    return prisma.payment_withdraw.findUnique({
+      where: { ref_code: refCode },
+    });
+  }
+
+  // Method สำหรับหา deposit record โดยใช้ refCode
+  async findDepositByRefCode(refCode: string): Promise<any> {
+    return prisma.payment_deposits.findUnique({
+      where: { ref_code: refCode },
+    });
+  }
+
+  // Method สำหรับหา withdraw record โดยใช้ refCode
+  async findWithdrawByRefCode(refCode: string): Promise<any> {
     return prisma.payment_withdraw.findUnique({
       where: { ref_code: refCode },
     });
