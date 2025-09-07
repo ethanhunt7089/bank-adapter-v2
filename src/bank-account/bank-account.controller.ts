@@ -14,7 +14,7 @@ import {
 import { BankAccountService } from "./bank-account.service";
 import { Request } from "express";
 
-@ApiTags("Banking")
+@ApiTags("BCEL-1 API")
 @Controller()
 export class BankAccountController {
   constructor(private readonly bankAccountService: BankAccountService) {}

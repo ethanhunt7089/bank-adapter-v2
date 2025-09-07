@@ -18,7 +18,7 @@ import {
 } from "@nestjs/swagger";
 import { Request } from "express";
 import { TransactionsService } from "./transactions.service";
-@ApiTags("Banking")
+@ApiTags("BCEL-1 API")
 @Controller()
 export class TransactionsController {
   constructor(private readonly transactionsService: TransactionsService) {}

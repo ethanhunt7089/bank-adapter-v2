@@ -13,8 +13,8 @@ async function bootstrap() {
 
   // Swagger Configuration
   const config = new DocumentBuilder()
-    .setTitle("BCEL gateway API")
-    .setDescription("BCEL gateway - Authentication & Banking Gateway")
+    .setTitle("Central Bank API")
+    .setDescription("Central Bank API - Authentication & Banking Gateway")
     .setVersion("1.0.0")
     .addServer("https://central-dragon-11.com/bcel-api", "Production") // เพิ่ม server URL
     // ไม่ fix server base URL เพื่อให้ Swagger ใช้ relative path ตรงกับแอป (ไม่มี /bcel-api)
@@ -45,7 +45,7 @@ async function bootstrap() {
 
   // Setup Swagger documentation
   SwaggerModule.setup("doc", app, document, {
-    customSiteTitle: "BCEL gateway API",
+    customSiteTitle: "Central Bank API",
     customfavIcon: "/favicon.ico",
     customCss: ".swagger-ui .topbar { display: none }",
   });
