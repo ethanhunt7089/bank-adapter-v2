@@ -31,16 +31,29 @@ export class PaymentChannelsResponseDto extends BaseResponseDto {
 // Create Payment Channel Request DTO
 export class CreatePaymentChannelDto {
   @ApiProperty({
-    example: "payment_gateway",
     description: "Type of payment channel",
     enum: ["payment_gateway", "bank_sms", "bank_slip"],
+    examples: {
+      payment_gateway: {
+        value: "payment_gateway",
+        description: "Payment gateway channel (BIB-Pay, OnePayX)",
+      },
+      bank_sms: {
+        value: "bank_sms",
+        description: "Bank SMS channel",
+      },
+      bank_slip: {
+        value: "bank_slip",
+        description: "Bank slip channel",
+      },
+    },
   })
   @IsString()
   @IsIn(["payment_gateway", "bank_sms", "bank_slip"])
   type: string;
 
   @ApiProperty({
-    example: "014",
+    example: null,
     description:
       "Bank code (required for bank_sms and bank_slip, null for payment_gateway)",
     required: false,
@@ -50,7 +63,7 @@ export class CreatePaymentChannelDto {
   bankCode?: string;
 
   @ApiProperty({
-    example: "1234567890",
+    example: null,
     description:
       "Bank account number (required for bank_sms and bank_slip, null for payment_gateway)",
     required: false,
@@ -60,7 +73,7 @@ export class CreatePaymentChannelDto {
   bankNo?: string;
 
   @ApiProperty({
-    example: "สมชาย ใจดี",
+    example: null,
     description:
       "Bank account name (required for bank_sms and bank_slip, null for payment_gateway)",
     required: false,

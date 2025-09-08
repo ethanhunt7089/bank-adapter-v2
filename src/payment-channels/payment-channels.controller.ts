@@ -14,6 +14,7 @@ import {
   ApiSecurity,
   ApiOperation,
   ApiResponse,
+  ApiBody,
 } from "@nestjs/swagger";
 import { PaymentChannelsService } from "./payment-channels.service";
 import {
@@ -95,6 +96,59 @@ export class PaymentChannelsController {
 
   @Post("create-payment-channels")
   @ApiOperation({ summary: "Create a new payment channel" })
+  @ApiBody({
+    type: CreatePaymentChannelDto,
+    examples: {
+      "Payment Gateway - BIB-Pay": {
+        value: {
+          type: "payment_gateway",
+          bankCode: null,
+          bankNo: null,
+          bankName: null,
+          enable: true,
+          autoDeposit: true,
+          autoWithdraw: false,
+          payment_sys: "bib-pay",
+        },
+      },
+      "Payment Gateway - OnePayX": {
+        value: {
+          type: "payment_gateway",
+          bankCode: null,
+          bankNo: null,
+          bankName: null,
+          enable: true,
+          autoDeposit: false,
+          autoWithdraw: true,
+          payment_sys: "onepay",
+        },
+      },
+      "Bank SMS": {
+        value: {
+          type: "bank_sms",
+          bankCode: "014",
+          bankNo: "1234567890",
+          bankName: "สมชาย ใจดี",
+          enable: true,
+          autoDeposit: true,
+          autoWithdraw: false,
+          payment_sys: null,
+        },
+      },
+      "Bank Slip": {
+        value: {
+          type: "bank_slip",
+          bankCode: "004",
+          bankNo: "9876543210",
+          bankName: "สมหญิง ใจงาม",
+          enable: true,
+          autoDeposit: false,
+          autoWithdraw: true,
+          payment_sys: null,
+        },
+      },
+    },
+  })
   @ApiResponse({
     status: 201,
     description: "Payment channel created successfully",
