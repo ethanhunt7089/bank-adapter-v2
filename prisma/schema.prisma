@@ -20,6 +20,7 @@ model Token {
   uuid              String              @unique @default(uuid()) @map("uuid")
   apiLogs           ApiLog[]
   transactionCursor TransactionCursor[]
+  paymentChannels   PaymentChannel[]
   @@map("tokens")
 }
 
@@ -101,4 +102,23 @@ model payment_withdraw {
   created_at             DateTime? @default(now()) @db.Timestamp(6)
   updated_at             DateTime? @default(now()) @db.Timestamp(6)
   completed_at           DateTime? @db.Timestamp(6)
+}
+
+model PaymentChannel {
+  id            Int      @id @default(autoincrement())
+  type          String   @db.VarChar(20) // "payment_gateway", "bank_sms", "bank_slip"
+  bankCode      String?  @db.VarChar(10) // null สำหรับ payment_gateway
+  bankNo        String?  @db.VarChar(50) // null สำหรับ payment_gateway  
+  bankName      String?  @db.VarChar(100) // null สำหรับ payment_gateway
+  paymentSys    String?  @db.VarChar(20) // สำหรับ payment_gateway เท่านั้น ("bib-pay", "onepay")
+  enable        Boolean  @default(true)
+  autoDeposit   Boolean  @default(false) @map("auto_deposit")
+  autoWithdraw  Boolean  @default(false) @map("auto_withdraw")
+  tokenUuid     String   @map("token_uuid") // เชื่อมกับ Token
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+  
+  token Token @relation(fields: [tokenUuid], references: [uuid])
+  
+  @@map("payment_channels")
 }
