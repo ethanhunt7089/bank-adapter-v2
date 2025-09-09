@@ -4,10 +4,16 @@ import { WebhookController } from "./controllers/webhook.controller";
 import { PaymentService } from "./services/payment.service";
 import { PaymentGatewayFactory } from "./factories/payment-gateway.factory";
 import { BibPayStrategy } from "./strategies/bibpay.strategy";
+import { PayOneXStrategy } from "./strategies/payonex.strategy";
 
 @Module({
   controllers: [PaymentController, WebhookController],
-  providers: [PaymentService, PaymentGatewayFactory, BibPayStrategy],
+  providers: [
+    PaymentService,
+    PaymentGatewayFactory,
+    BibPayStrategy,
+    PayOneXStrategy,
+  ],
   exports: [PaymentService],
 })
 export class PaymentModule {}

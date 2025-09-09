@@ -84,6 +84,80 @@ export class WebhookController {
     }
   }
 
+  @Post("webhooks/payonex")
+  async handlePayOneXWebhook(@Body() webhookData: any) {
+    // Log ข้อมูลที่ได้รับจาก PayOneX
+    this.logger.log("=== PayOneX Webhook Received ===");
+    this.logger.log(
+      `Raw webhook data: ${JSON.stringify(webhookData, null, 2)}`
+    );
+    this.logger.log(`Webhook data type: ${typeof webhookData}`);
+    this.logger.log(
+      `Webhook data keys: ${Object.keys(webhookData).join(", ")}`
+    );
+
+    // Log แต่ละ field ที่สำคัญ
+    if (webhookData.referenceId)
+      this.logger.log(`referenceId: ${webhookData.referenceId}`);
+    if (webhookData.status) this.logger.log(`status: ${webhookData.status}`);
+    if (webhookData.amount) this.logger.log(`amount: ${webhookData.amount}`);
+    if (webhookData.transactionId)
+      this.logger.log(`transactionId: ${webhookData.transactionId}`);
+    if (webhookData.message) this.logger.log(`message: ${webhookData.message}`);
+    if (webhookData.transactionType)
+      this.logger.log(`transactionType: ${webhookData.transactionType}`);
+
+    // Log headers และ metadata อื่นๆ
+    this.logger.log(`Webhook timestamp: ${new Date().toISOString()}`);
+    this.logger.log("=== End PayOneX Webhook Data ===");
+
+    try {
+      // เอา reference จาก webhookData
+      const refCode =
+        webhookData.referenceId ||
+        webhookData.data?.referenceId ||
+        webhookData.refCode ||
+        `PAYONEX-WEBHOOK-${Date.now()}`;
+
+      // หา transactionType จาก database โดยใช้ refCode
+      let transactionType: "deposit" | "withdraw" | undefined;
+
+      // หาใน payment_deposits
+      const depositRecord =
+        await this.paymentService.findDepositByRefCode(refCode);
+      if (depositRecord) {
+        transactionType = "deposit";
+      } else {
+        // หาใน payment_withdraw
+        const withdrawRecord =
+          await this.paymentService.findWithdrawByRefCode(refCode);
+        if (withdrawRecord) {
+          transactionType = "withdraw";
+        }
+      }
+
+      // เรียก PaymentService เพื่อประมวลผล webhook
+      await this.paymentService.handleWebhook({
+        refCode: refCode,
+        transactionType: transactionType,
+        gatewayType: "onepayx",
+        data: webhookData,
+      });
+
+      this.logger.log("✅ PayOneX webhook processed successfully");
+      return {
+        success: true,
+        message: "PayOneX webhook processed successfully",
+      };
+    } catch (error) {
+      this.logger.error(
+        `❌ Error processing PayOneX webhook: ${error.message}`
+      );
+      this.logger.error(`Error stack: ${error.stack}`);
+      return { success: false, message: error.message };
+    }
+  }
+
   // EasyPay webhook endpoint removed since EasyPay strategy is no longer used
 
   // Endpoint ใหม่สำหรับทดสอบ webhook
