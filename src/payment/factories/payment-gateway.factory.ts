@@ -11,8 +11,8 @@ export class PaymentGatewayFactory {
     switch (gatewayType) {
       case GatewayType.BIBPAY:
         return this.bibPayStrategy;
-      case GatewayType.ONEPAY:
-        throw new Error("OnePayX strategy is not implemented yet");
+      case GatewayType.ONEPAYX:
+        throw new Error("PayOneX strategy is not implemented yet");
       default:
         throw new Error(`Unsupported gateway type: ${gatewayType}`);
     }
@@ -23,6 +23,6 @@ export class PaymentGatewayFactory {
   }
 
   getAllPaymentSystems(): string[] {
-    return ["BIB-pay", "OnePayX"]; // ทั้งหมดที่จะรองรับ (รวม OnePayX ที่ยังไม่ได้ทำ)
+    return ["BIB-pay", "PayOneX"]; // ทั้งหมดที่จะรองรับ (รวม PayOneX ที่ยังไม่ได้ทำ)
   }
 }

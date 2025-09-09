@@ -1,0 +1,84 @@
+PayOneX API tester
+-------------------------
+---1. Gen token---
+curl --location 'https://api.payonex.asia/authenticate' \
+--header 'Content-Type: application/json' \
+--header 'Accept: application/json' \
+--data '{
+  "accessKey": "de9c93b8-d2c9-49ec-9bcb-57b6d3ed3644",
+  "secretKey": "9b1e42ae-c0a9-413a-b163-6f260f08d3a7"
+}'
+RESPONSE
+{"success":true,"message":"successfully","code":"20000","data":{"token":"<TOKEN>"}}
+
+---2. Get balance---
+curl --location 'https://api.payonex.asia/profile/balance' \
+--header 'Accept: application/json' \
+--header 'Authorization: <TOKEN>'
+RESPONSE
+{"success":true,"message":"successfully","code":"20000","data":{"settleBalance":"0.00","balance":"0.00"}}
+
+---3. Get bank code---
+curl --location 'https://api.payonex.asia/customers/options/bank-codes' \
+--header 'Accept: application/json'
+RESPONSE
+{
+    "success": true,
+    "message": "successfully",
+    "code": "20000",
+    "data": [
+        {
+            "bank_code": "BBL",
+            "bank_name_th": "ธนาคารกรุงเทพ",
+            "bank_name_en": "Bangkok Bank"
+        },
+        {
+            "bank_code": "KBANK",
+            "bank_name_th": "ธนาคารกสิกรไทย",
+            "bank_name_en": "Kasikorn Bank"
+        }
+	]
+}
+
+---4. Create user---
+curl --location 'https://api.payonex.asia/v2/customers' \
+--header 'Content-Type: application/json' \
+--header 'Accept: application/json' \
+--header 'Authorization: <TOKEN>' \
+--data '{ 
+    "name" : "ทรงชัย เปรมประสพโชค",
+    "bankCode": "SCB", 
+    "accountNo": "4190018195"
+}'
+RESPONSE
+{"success":true,"message":"successfully","code":"20000","data":{"partner":"PAYONEX","customerUuid":"7c7199c0-502c-40f5-8c94-6512e9b87fca","clientCode":"LOKI789","name":"ทรงชัย เปรมประสพโชค","searchName":["ทรงชัย เปรมประสพโชค"],"accountNo":"4190018195","bankCode":"SCB","status":"SUCCESS","createdAt":1757346901292,"updatedAt":1757346901292,"verify":"FALSE"}}
+
+---5. Create deposit---
+curl --location 'https://api.payonex.asia/transactions/deposit/request' \
+--header 'Content-Type: application/json' \
+--header 'Accept: application/json' \
+--header 'Authorization: <TOKEN>' \
+--data '{
+  "customerUuid": "7c7199c0-502c-40f5-8c94-6512e9b87fca",
+  "amount": "205",
+  "referenceId":"central-00000001",
+  "note":"ทดสอบ",
+  "remark":"ทดสอบ"
+}'
+RESPONSE
+{"success":true,"message":"successfully","code":"20000","data":{"link":"https://payment.payonex.asia/pay/9844779c-aaf2-4fe5-a8d2-6419e9a3594b","qrCode":"00020101021153037645802TH29370016A000000677010111011300669618168625406205.0063046D89","uuid":"9844779c-aaf2-4fe5-a8d2-6419e9a3594b","clientName":"LOKI789","customerName":"LOKI789","qrExpireTime":1757348099676,"qrType":"QRCODE","option":"QR_CODE","amount":205,"transferAmount":205,"redirectUrl":""}}
+
+---6. Create withdraw---
+curl --location 'https://api.payonex.asia/transactions/withdraw/request' \
+--header 'Content-Type: application/json' \
+--header 'Accept: application/json' \
+--header 'Authorization: <TOKEN>' \
+--data '{
+  "customerUuid": "7c7199c0-502c-40f5-8c94-6512e9b87fca",
+  "amount": "201",
+  "referenceId":"central-00000002",
+  "note":"ทดสอบ note",
+  "remark":"ทดสอบ Remark"
+}'
+RESPONSE
+{"success":false,"message":"No available channel for withdraw","code":"40134","data":"no available channel for withdraw"}

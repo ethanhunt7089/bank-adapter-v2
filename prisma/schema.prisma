@@ -12,9 +12,10 @@ model Token {
   targetDomain      String              @unique @map("target_domain")
   tokenHash         String?             @unique @map("token_hash")
   isActive          Boolean             @default(true) @map("is_active")
-  paymentSys        String?             @map("payment_sys") // รองรับ payment systems: 'easypay', 'bibpay', 'future-payment'
-  paymentKey        String?             @map("payment_key") // API key สำหรับ payment gateway
+  paymentSys        String?             @map("payment_sys") // รองรับ payment systems: 'easypay', 'bibpay', 'onepayx'
+  paymentKey        String?             @map("payment_key") // API key สำหรับ payment gateway (TOKEN สำหรับ PayOneX)
   paymentSecret     String?             @map("payment_secret") // Secret key สำหรับ payment gateway
+  paymentAccess     String?             @map("payment_access") // Access key สำหรับ PayOneX
   createdAt         DateTime            @default(now()) @map("created_at")
   updatedAt         DateTime            @updatedAt @map("updated_at")
   uuid              String              @unique @default(uuid()) @map("uuid")
@@ -121,4 +122,35 @@ model PaymentChannel {
   token Token @relation(fields: [tokenUuid], references: [uuid])
   
   @@map("payment_channels")
+}
+
+model PayonexCustomer {
+  id           Int      @id @default(autoincrement())
+  customerId   String   @map("customer_id") @db.VarChar(50)
+  accountName  String   @map("account_name") @db.VarChar(100)
+  bankNumber   String   @map("bank_number") @db.VarChar(20)
+  bankCode     String   @map("bank_code") @db.VarChar(10)
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@index([customerId], name: "idx_payonex_customer_id")
+  @@index([accountName], name: "idx_payonex_account_name")
+  @@index([bankNumber], name: "idx_payonex_bank_number")
+  @@index([bankCode], name: "idx_payonex_bank_code")
+  @@unique([accountName, bankNumber, bankCode], name: "unique_payonex_customer")
+  @@map("payonex_customer")
+}
+
+model BankInfo {
+  id           Int     @id @default(autoincrement())
+  bankName     String  @map("bank_name") @db.VarChar(100)
+  bankCode     String  @map("bank_code") @db.VarChar(10)
+  centralCode  String? @map("central_code") @db.VarChar(10)
+  bibCode      String? @map("bib_code") @db.VarChar(10)
+  payonexCode  String? @map("payonex_code") @db.VarChar(10)
+
+  @@unique([bankCode], name: "unique_bank_code")
+  @@index([centralCode], name: "idx_bank_central_code")
+  @@index([bibCode], name: "idx_bank_bib_code")
+  @@index([payonexCode], name: "idx_bank_payonex_code")
+  @@map("bank_info")
 }
