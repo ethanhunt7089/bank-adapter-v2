@@ -329,7 +329,7 @@ export class PayOneXStrategy implements IPaymentGateway {
   }
 
   getGatewayType(): GatewayType {
-    return GatewayType.ONEPAYX;
+    return GatewayType.PAYONEX;
   }
 
   async getBalance(token: any): Promise<any> {

@@ -17,7 +17,7 @@ async function refreshPayOneXTokens() {
     // หา tokens ทั้งหมดที่เป็น PayOneX และ active
     const payonexTokens = await prisma.token.findMany({
       where: {
-        paymentSys: "onepayx",
+        paymentSys: "payonex",
         isActive: true,
         paymentAccess: { not: null },
         paymentSecret: { not: null },
@@ -63,6 +63,17 @@ async function refreshPayOneXTokens() {
           `PayOneX API Response:`,
           JSON.stringify(response.data, null, 2)
         );
+        console.log(
+          `Request payload:`,
+          JSON.stringify(
+            {
+              accessKey: token.paymentAccess,
+              secretKey: token.paymentSecret,
+            },
+            null,
+            2
+          )
+        );
 
         if (response.data.success && response.data.data?.token) {
           const newToken = response.data.data.token;
@@ -106,7 +117,21 @@ async function refreshPayOneXTokens() {
 
         if (error.response) {
           console.error(`API Error Status: ${error.response.status}`);
-          console.error(`API Error Data:`, error.response.data);
+          console.error(
+            `API Error Data:`,
+            JSON.stringify(error.response.data, null, 2)
+          );
+          console.error(
+            `Request payload was:`,
+            JSON.stringify(
+              {
+                accessKey: token.paymentAccess,
+                secretKey: token.paymentSecret,
+              },
+              null,
+              2
+            )
+          );
         }
 
         results.push({

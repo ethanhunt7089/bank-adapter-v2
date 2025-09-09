@@ -35,7 +35,7 @@ export interface WithdrawResponse {
 export interface WebhookData {
   refCode: string;
   transactionType: "deposit" | "withdraw";
-  gatewayType: "bibpay" | "onepayx";
+  gatewayType: "bibpay" | "payonex";
   data: any;
 }
 
@@ -61,7 +61,7 @@ export enum PaymentStatus {
 
 export enum GatewayType {
   BIBPAY = "bibpay",
-  ONEPAYX = "onepayx",
+  PAYONEX = "payonex",
 }
 
 export enum TransactionType {

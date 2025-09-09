@@ -140,7 +140,7 @@ export class WebhookController {
       await this.paymentService.handleWebhook({
         refCode: refCode,
         transactionType: transactionType,
-        gatewayType: "onepayx",
+        gatewayType: "payonex",
         data: webhookData,
       });
 

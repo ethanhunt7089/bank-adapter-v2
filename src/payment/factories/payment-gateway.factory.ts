@@ -15,7 +15,7 @@ export class PaymentGatewayFactory {
     switch (gatewayType) {
       case GatewayType.BIBPAY:
         return this.bibPayStrategy;
-      case GatewayType.ONEPAYX:
+      case GatewayType.PAYONEX:
         return this.payOneXStrategy;
       default:
         throw new Error(`Unsupported gateway type: ${gatewayType}`);
@@ -23,7 +23,7 @@ export class PaymentGatewayFactory {
   }
 
   getSupportedGateways(): GatewayType[] {
-    return [GatewayType.BIBPAY, GatewayType.ONEPAYX]; // ทั้งคู่ implement แล้ว
+    return [GatewayType.BIBPAY, GatewayType.PAYONEX]; // ทั้งคู่ implement แล้ว
   }
 
   getAllPaymentSystems(): string[] {
