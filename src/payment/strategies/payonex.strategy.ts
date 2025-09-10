@@ -9,14 +9,14 @@ import {
   WebhookData,
   GatewayType,
 } from "../interfaces/payment-gateway.interface";
-import { prisma } from "../../lib/prisma";
+import { PrismaService } from "../../lib/prisma.service";
 
 @Injectable()
 export class PayOneXStrategy implements IPaymentGateway {
   private readonly logger = new Logger(PayOneXStrategy.name);
   private readonly baseUrl = "https://api.payonex.asia";
 
-  constructor() {}
+  constructor(private readonly prisma: PrismaService) {}
 
   // ดึง credentials จาก Token
   private getAccessKey(token: any): string {
@@ -50,7 +50,7 @@ export class PayOneXStrategy implements IPaymentGateway {
 
       if (response.data.success && response.data.data?.token) {
         // อัพเดต paymentKey ใน database ด้วย token ใหม่
-        await prisma.token.update({
+        await this.prisma.token.update({
           where: { uuid: token.uuid },
           data: { paymentKey: response.data.data.token },
         });
@@ -76,7 +76,7 @@ export class PayOneXStrategy implements IPaymentGateway {
   ): Promise<string | null> {
     try {
       // เช็คว่ามี customer อยู่แล้วหรือไม่
-      const existingCustomer = await prisma.payonexCustomer.findUnique({
+      const existingCustomer = await this.prisma.payonexCustomer.findUnique({
         where: {
           unique_payonex_customer: {
             accountName: payload.accountName,
@@ -111,7 +111,7 @@ export class PayOneXStrategy implements IPaymentGateway {
         const customerUuid = response.data.data.customerUuid;
 
         // บันทึกลง database
-        await prisma.payonexCustomer.create({
+        await this.prisma.payonexCustomer.create({
           data: {
             customerId: customerUuid,
             accountName: payload.accountName,
@@ -324,8 +324,63 @@ export class PayOneXStrategy implements IPaymentGateway {
 
   async handleWebhook(webhookData: WebhookData): Promise<void> {
     // PayOneX webhook handling logic
-    // This will be implemented based on the webhook data structure
     this.logger.log("PayOneX webhook received:", webhookData);
+
+    try {
+      const { refCode, transactionType, data } = webhookData;
+      const status = data.status;
+
+      this.logger.log(
+        `Processing PayOneX webhook for ${refCode}, status: ${status}`
+      );
+
+      if (transactionType === "deposit") {
+        // อัพเดต deposit status
+        const updateData: any = {
+          status: status === "SUCCESS" ? "completed" : "fail",
+          gateway_response: data,
+          updated_at: new Date(),
+        };
+
+        if (status === "SUCCESS") {
+          updateData.completed_at = new Date();
+        }
+
+        await this.prisma.payment_deposits.updateMany({
+          where: { ref_code: refCode },
+          data: updateData,
+        });
+
+        this.logger.log(
+          `✅ Updated deposit ${refCode} to ${updateData.status}`
+        );
+      } else if (transactionType === "withdraw") {
+        // อัพเดต withdraw status
+        const updateData: any = {
+          status: status === "SUCCESS" ? "completed" : "fail",
+          gateway_response: data,
+          updated_at: new Date(),
+        };
+
+        if (status === "SUCCESS") {
+          updateData.completed_at = new Date();
+        }
+
+        await this.prisma.payment_withdraw.updateMany({
+          where: { ref_code: refCode },
+          data: updateData,
+        });
+
+        this.logger.log(
+          `✅ Updated withdraw ${refCode} to ${updateData.status}`
+        );
+      }
+    } catch (error) {
+      this.logger.error(
+        `❌ Error processing PayOneX webhook: ${error.message}`
+      );
+      throw error;
+    }
   }
 
   getGatewayType(): GatewayType {

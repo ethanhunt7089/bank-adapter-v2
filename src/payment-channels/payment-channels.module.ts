@@ -4,6 +4,7 @@ import { PaymentChannelsService } from "./payment-channels.service";
 import { PrismaService } from "../lib/prisma.service";
 import { PaymentGatewayFactory } from "../payment/factories/payment-gateway.factory";
 import { BibPayStrategy } from "../payment/strategies/bibpay.strategy";
+import { PayOneXStrategy } from "../payment/strategies/payonex.strategy";
 
 @Module({
   controllers: [PaymentChannelsController],
@@ -12,6 +13,7 @@ import { BibPayStrategy } from "../payment/strategies/bibpay.strategy";
     PrismaService,
     PaymentGatewayFactory,
     BibPayStrategy,
+    PayOneXStrategy,
   ],
 })
 export class PaymentChannelsModule {}

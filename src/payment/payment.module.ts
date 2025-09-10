@@ -5,6 +5,7 @@ import { PaymentService } from "./services/payment.service";
 import { PaymentGatewayFactory } from "./factories/payment-gateway.factory";
 import { BibPayStrategy } from "./strategies/bibpay.strategy";
 import { PayOneXStrategy } from "./strategies/payonex.strategy";
+import { PrismaService } from "../lib/prisma.service";
 
 @Module({
   controllers: [PaymentController, WebhookController],
@@ -13,6 +14,7 @@ import { PayOneXStrategy } from "./strategies/payonex.strategy";
     PaymentGatewayFactory,
     BibPayStrategy,
     PayOneXStrategy,
+    PrismaService,
   ],
   exports: [PaymentService],
 })
