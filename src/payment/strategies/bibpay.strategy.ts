@@ -1,6 +1,7 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import axios from "axios";
+import { PrismaService } from "../../lib/prisma.service";
 import {
   IPaymentGateway,
   CreateDepositPayload,
@@ -13,10 +14,14 @@ import {
 
 @Injectable()
 export class BibPayStrategy implements IPaymentGateway {
+  private readonly logger = new Logger(BibPayStrategy.name);
   private readonly baseUrl = "https://bibpay-api-wahja.ondigitalocean.app";
   private readonly balanceUrl = "https://api.bibbyx.com";
 
-  constructor(private readonly configService: ConfigService) {}
+  constructor(
+    private readonly configService: ConfigService,
+    private readonly prisma: PrismaService
+  ) {}
 
   // ใช้ keys จาก Token ที่ส่งมา
   private getApiKey(token: any): string {
@@ -27,15 +32,69 @@ export class BibPayStrategy implements IPaymentGateway {
     return token.paymentSecret;
   }
 
+  // ตรวจสอบ bank code ว่ามีใน BibPay หรือไม่
+  private async validateBankCodeForBibPay(bankCode: string): Promise<string> {
+    try {
+      this.logger.log(`=== BibPay Bank Code Validation ===`);
+      this.logger.log(
+        `Input bankCode: "${bankCode}" (type: ${typeof bankCode})`
+      );
+
+      // หาข้อมูล bank จาก bank_info table
+      const bankInfo = await this.prisma.bankInfo.findFirst({
+        where: {
+          bankCode: bankCode,
+        },
+      });
+
+      this.logger.log(
+        `Found bankInfo:`,
+        bankInfo
+          ? {
+              id: bankInfo.id,
+              bankName: bankInfo.bankName,
+              bankCode: bankInfo.bankCode,
+              centralCode: bankInfo.centralCode,
+              bibCode: bankInfo.bibCode,
+              payonexCode: bankInfo.payonexCode,
+            }
+          : "null"
+      );
+
+      if (bankInfo) {
+        this.logger.log(
+          `✅ Bank code validated: ${bankCode} is supported by BibPay`
+        );
+        return bankCode; // ใช้ bankCode เดิม
+      }
+
+      // ถ้าไม่เจอ ให้ throw error
+      this.logger.error(`❌ No bank found in database: ${bankCode}`);
+      this.logger.log(`=== End BibPay Bank Code Validation ===`);
+      throw new Error(`Bank code ${bankCode} is not supported by BibPay`);
+    } catch (error) {
+      this.logger.error(
+        `❌ Error validating bank code ${bankCode}:`,
+        error.message
+      );
+      throw error;
+    }
+  }
+
   async createDeposit(
     payload: CreateDepositPayload,
     token: any
   ): Promise<DepositResponse> {
     try {
+      // ตรวจสอบ bank code ก่อน
+      const bibpayBankCode = await this.validateBankCodeForBibPay(
+        payload.bankCode
+      );
+
       const bibpayPayload = {
         bankName: payload.accountName, // เปลี่ยนจาก accountName เป็น bankName
         bankNumber: payload.bankNumber,
-        bankCode: payload.bankCode,
+        bankCode: bibpayBankCode, // ใช้ BibPay bank code
         callbackUrl: "https://central-dragon-11.com/bcel-api/webhooks/bibpay", // Hardcode callbackUrl
         refferend: payload.refCode, // เปลี่ยนจาก refCode เป็น refferend
         amount: payload.amount.toString(),
@@ -123,10 +182,15 @@ export class BibPayStrategy implements IPaymentGateway {
     token: any
   ): Promise<WithdrawResponse> {
     try {
+      // ตรวจสอบ bank code ก่อน
+      const bibpayBankCode = await this.validateBankCodeForBibPay(
+        payload.bankCode
+      );
+
       const bibpayPayload = {
         bankName: payload.accountName, // เปลี่ยนจาก accountName เป็น bankName
         bankNumber: payload.bankNumber,
-        bankCode: payload.bankCode,
+        bankCode: bibpayBankCode, // ใช้ BibPay bank code
         callbackUrl: "https://central-dragon-11.com/bcel-api/webhooks/bibpay", // Hardcode callbackUrl
         refferend: payload.refCode, // เปลี่ยนจาก refCode เป็น refferend
         amount: payload.amount.toString(),

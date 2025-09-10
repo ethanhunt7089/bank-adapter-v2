@@ -75,8 +75,8 @@ async function refreshPayOneXTokens() {
           )
         );
 
-        if (response.data.success && response.data.data?.token) {
-          const newToken = response.data.data.token;
+        if (response.data.success && response.data.data?.TOKEN) {
+          const newToken = response.data.data.TOKEN;
 
           // Update token in database
           await prisma.token.update({
@@ -173,13 +173,24 @@ async function refreshPayOneXTokens() {
   }
 }
 
-// Run the refresh
-refreshPayOneXTokens()
-  .then(() => {
-    console.log("Script completed successfully");
-    process.exit(0);
-  })
-  .catch((error) => {
-    console.error("Script failed:", error.message);
-    process.exit(1);
-  });
+// Run the refresh every 20 hours
+async function runCron() {
+  while (true) {
+    try {
+      await refreshPayOneXTokens();
+      console.log("Waiting 20 hours until next refresh...");
+
+      // Wait 20 hours (20 * 60 * 60 * 1000 milliseconds)
+      await new Promise((resolve) => setTimeout(resolve, 20 * 60 * 60 * 1000));
+    } catch (error) {
+      console.error("Cron job error:", error.message);
+      console.log("Waiting 1 hour before retry...");
+
+      // Wait 1 hour before retry on error
+      await new Promise((resolve) => setTimeout(resolve, 60 * 60 * 1000));
+    }
+  }
+}
+
+// Start the cron job
+runCron();

@@ -69,19 +69,73 @@ export class PayOneXStrategy implements IPaymentGateway {
     }
   }
 
+  // แปลง bank code จากตัวเลขเป็น PayOneX format
+  private async convertBankCodeToPayOneX(bankCode: string): Promise<string> {
+    try {
+      this.logger.log(`=== Bank Code Conversion Debug ===`);
+      this.logger.log(
+        `Input bankCode: "${bankCode}" (type: ${typeof bankCode})`
+      );
+
+      // หาข้อมูล bank จาก bank_info table
+      const bankInfo = await this.prisma.bankInfo.findFirst({
+        where: {
+          bankCode: bankCode,
+        },
+      });
+
+      this.logger.log(
+        `Found bankInfo:`,
+        bankInfo
+          ? {
+              id: bankInfo.id,
+              bankName: bankInfo.bankName,
+              bankCode: bankInfo.bankCode,
+              centralCode: bankInfo.centralCode,
+              bibCode: bankInfo.bibCode,
+              payonexCode: bankInfo.payonexCode,
+            }
+          : "null"
+      );
+
+      if (bankInfo && bankInfo.payonexCode) {
+        this.logger.log(
+          `✅ Bank code converted: ${bankCode} → ${bankInfo.payonexCode}`
+        );
+        return bankInfo.payonexCode;
+      }
+
+      // ถ้าไม่เจอ ให้ throw error
+      this.logger.error(`❌ No PayOneX code found for bank: ${bankCode}`);
+      this.logger.log(`=== End Bank Code Conversion Debug ===`);
+      throw new Error(`Bank code ${bankCode} is not supported by PayOneX`);
+    } catch (error) {
+      this.logger.error(
+        `❌ Error converting bank code ${bankCode}:`,
+        error.message
+      );
+      return bankCode; // fallback to original
+    }
+  }
+
   // จัดการ customer - สร้างใหม่หรือดึงที่มีอยู่
   private async getOrCreateCustomer(
     payload: CreateDepositPayload | CreateWithdrawPayload,
     authToken: string
   ): Promise<string | null> {
     try {
+      // แปลง bank code เป็น PayOneX format
+      const payonexBankCode = await this.convertBankCodeToPayOneX(
+        payload.bankCode
+      );
+
       // เช็คว่ามี customer อยู่แล้วหรือไม่
       const existingCustomer = await this.prisma.payonexCustomer.findUnique({
         where: {
           unique_payonex_customer: {
             accountName: payload.accountName,
             bankNumber: payload.bankNumber,
-            bankCode: payload.bankCode,
+            bankCode: payonexBankCode, // ใช้ PayOneX bank code
           },
         },
       });
@@ -95,7 +149,7 @@ export class PayOneXStrategy implements IPaymentGateway {
         `${this.baseUrl}/v2/customers`,
         {
           name: payload.accountName,
-          bankCode: payload.bankCode,
+          bankCode: payonexBankCode, // ใช้ PayOneX bank code
           accountNo: payload.bankNumber,
         },
         {
@@ -116,7 +170,7 @@ export class PayOneXStrategy implements IPaymentGateway {
             customerId: customerUuid,
             accountName: payload.accountName,
             bankNumber: payload.bankNumber,
-            bankCode: payload.bankCode,
+            bankCode: payonexBankCode, // ใช้ PayOneX bank code
           },
         });
 
@@ -265,10 +319,23 @@ export class PayOneXStrategy implements IPaymentGateway {
         remark: `Withdraw for ${payload.accountName}`,
       };
 
-      this.logger.log(`=== Sending to PayOneX API (Withdraw) ===`);
-      this.logger.log(`URL: ${this.baseUrl}/transactions/withdraw/request`);
-      this.logger.log(`Payload:`, JSON.stringify(payonexPayload, null, 2));
-      this.logger.log(`Authorization: ${authToken}`);
+      this.logger.log(`=== PayOneX Withdraw Request Details ===`);
+      this.logger.log(`Original Input:`);
+      this.logger.log(`- refCode: ${payload.refCode}`);
+      this.logger.log(`- amount: ${payload.amount}`);
+      this.logger.log(`- accountName: ${payload.accountName}`);
+      this.logger.log(`- bankNumber: ${payload.bankNumber}`);
+      this.logger.log(`- bankCode: ${payload.bankCode}`);
+      this.logger.log(`- callbackUrl: ${payload.callbackUrl}`);
+      this.logger.log(``);
+      this.logger.log(`PayOneX API Request:`);
+      this.logger.log(`- URL: ${this.baseUrl}/transactions/withdraw/request`);
+      this.logger.log(`- Method: POST`);
+      this.logger.log(`- Headers:`);
+      this.logger.log(`  - Content-Type: application/json`);
+      this.logger.log(`  - Accept: application/json`);
+      this.logger.log(`  - Authorization: ${authToken}`);
+      this.logger.log(`- Body:`, JSON.stringify(payonexPayload, null, 2));
       this.logger.log(`================================`);
 
       const response = await axios.post(
@@ -284,6 +351,11 @@ export class PayOneXStrategy implements IPaymentGateway {
       );
 
       const responseData = response.data;
+
+      this.logger.log(`=== PayOneX API Response (Withdraw) ===`);
+      this.logger.log(`Status: ${response.status}`);
+      this.logger.log(`Response:`, JSON.stringify(responseData, null, 2));
+      this.logger.log(`================================`);
 
       if (responseData.success) {
         return {
