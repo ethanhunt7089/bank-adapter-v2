@@ -62,6 +62,14 @@ export class PaymentService {
         };
       }
 
+      // ตรวจสอบว่า token รองรับการฝากเงินหรือไม่
+      if (!token.deposit) {
+        return {
+          success: false,
+          message: `Deposit is disabled for this token. Please enable deposit in token settings.`,
+        };
+      }
+
       // Check if deposit already exists
       const existingDeposit = await prisma.payment_deposits.findUnique({
         where: { ref_code: payload.refCode },
@@ -183,6 +191,14 @@ export class PaymentService {
         return {
           success: false,
           message: `Invalid payment system in token: ${token.paymentSys}`,
+        };
+      }
+
+      // ตรวจสอบว่า token รองรับการถอนเงินหรือไม่
+      if (!token.withdraw) {
+        return {
+          success: false,
+          message: `Withdraw is disabled for this token. Please enable withdraw in token settings.`,
         };
       }
 

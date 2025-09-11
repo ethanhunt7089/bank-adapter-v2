@@ -23,7 +23,7 @@ export class UserService {
   async register(
     registerDto: RegisterDto
   ): Promise<{ success: boolean; message: string; access_token?: string }> {
-    const { username, password, tokenUuid } = registerDto;
+    const { username, password, tokenUuid: token } = registerDto;
 
     // ตรวจสอบว่า username มีอยู่แล้วหรือไม่
     const existingUser = await this.prisma.user.findUnique({
@@ -34,23 +34,23 @@ export class UserService {
       throw new ConflictException("Username already exists");
     }
 
-    // ตรวจสอบว่า tokenUuid มีอยู่ใน bo_token หรือไม่
+    // ตรวจสอบว่า token มีอยู่ใน bo_token หรือไม่
     const boToken = await this.prisma.boToken.findUnique({
-      where: { token: tokenUuid },
+      where: { token },
     });
 
     if (!boToken) {
-      throw new NotFoundException("Token UUID not found in bo_token table");
+      throw new NotFoundException("Token not found in bo_token table");
     }
 
-    // ตรวจสอบว่า tokenUuid นี้ถูกใช้แล้วหรือไม่
+    // ตรวจสอบว่า token นี้ถูกใช้แล้วหรือไม่
     const existingUserWithToken = await this.prisma.user.findFirst({
-      where: { tokenUuid },
+      where: { token },
     });
 
     if (existingUserWithToken) {
       throw new ConflictException(
-        "Token UUID is already associated with another user"
+        "Token is already associated with another user"
       );
     }
 
@@ -62,7 +62,7 @@ export class UserService {
       data: {
         username,
         password: hashedPassword,
-        tokenUuid,
+        token,
       },
     });
 
@@ -120,7 +120,7 @@ export class UserService {
         id: true,
         username: true,
         isActive: true,
-        tokenUuid: true,
+        token: true,
         createdAt: true,
       },
     });
@@ -135,7 +135,7 @@ export class UserService {
         id: user.id,
         username: user.username,
         isActive: user.isActive,
-        tokenUuid: user.tokenUuid,
+        tokenUuid: user.token,
         createdAt: user.createdAt,
       },
     };
@@ -220,7 +220,7 @@ export class UserService {
         id: true,
         username: true,
         isActive: true,
-        tokenUuid: true,
+        token: true,
       },
     });
 

@@ -30,7 +30,7 @@ export class UserJwtStrategy extends PassportStrategy(Strategy) {
         id: true,
         username: true,
         isActive: true,
-        tokenUuid: true,
+        token: true,
       },
     });
 
@@ -45,7 +45,7 @@ export class UserJwtStrategy extends PassportStrategy(Strategy) {
     return {
       sub: user.id,
       username: user.username,
-      tokenUuid: user.tokenUuid,
+      tokenUuid: user.token,
     };
   }
 }
