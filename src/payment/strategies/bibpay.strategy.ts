@@ -145,6 +145,12 @@ export class BibPayStrategy implements IPaymentGateway {
 
       const responseData = response.data;
 
+      // Log response จาก BibPay
+      console.log(`=== BibPay API Response ===`);
+      console.log(`Status: ${response.status}`);
+      console.log(`Response:`, JSON.stringify(responseData, null, 2));
+      console.log(`========================`);
+
       // แก้ไขการเช็ค status - BIB-Pay ส่ง status: true
       if (responseData.status === true || responseData.status === "success") {
         // แปลง QR Code string เป็น image URL
