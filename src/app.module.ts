@@ -7,6 +7,7 @@ import { BankAccountModule } from "./bank-account/bank-account.module";
 import { TransactionsModule } from "./transactions/transactions.module";
 import { PaymentModule } from "./payment/payment.module";
 import { PaymentChannelsModule } from "./payment-channels/payment-channels.module";
+import { UserModule } from "./user/user.module";
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -17,6 +18,7 @@ import { PaymentChannelsModule } from "./payment-channels/payment-channels.modul
     TransactionsModule,
     PaymentModule,
     PaymentChannelsModule,
+    UserModule,
   ],
   controllers: [AppController],
   providers: [AppService],

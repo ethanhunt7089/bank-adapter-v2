@@ -167,6 +167,7 @@ model BoToken {
   updatedAt    DateTime @updatedAt @map("updated_at")
   
   paymentKeys  PaymentKey[]
+  users        User[]       // One-to-many relation to User
   
   @@map("bo_token")
 }
@@ -187,4 +188,21 @@ model PaymentKey {
   @@index([token], name: "idx_payment_key_token")
   @@index([paymentSys], name: "idx_payment_key_payment_sys")
   @@map("payment_key")
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  username  String   @unique @db.VarChar(50)
+  password  String   @db.VarChar(255) // hashed password
+  tokenUuid String?  @map("token_uuid") @db.Uuid
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relation to BoToken
+  boToken BoToken? @relation(fields: [tokenUuid], references: [token])
+
+  @@index([username], name: "idx_user_username")
+  @@index([tokenUuid], name: "idx_user_token_uuid")
+  @@map("users")
 }
