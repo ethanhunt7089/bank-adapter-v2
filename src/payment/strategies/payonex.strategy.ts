@@ -18,27 +18,27 @@ export class PayOneXStrategy implements IPaymentGateway {
 
   constructor(private readonly prisma: PrismaService) {}
 
-  // ดึง credentials จาก Token
-  private getAccessKey(token: any): string {
-    return token.paymentAccess;
+  // ดึง credentials จาก PaymentKey
+  private getAccessKey(paymentKey: any): string {
+    return paymentKey.paymentAccess;
   }
 
-  private getSecretKey(token: any): string {
-    return token.paymentSecret;
+  private getSecretKey(paymentKey: any): string {
+    return paymentKey.paymentSecret;
   }
 
-  private getAuthToken(token: any): string {
-    return token.paymentKey;
+  private getAuthToken(paymentKey: any): string {
+    return paymentKey.paymentKey;
   }
 
   // สร้าง authentication token
-  private async authenticate(token: any): Promise<string | null> {
+  private async authenticate(paymentKey: any): Promise<string | null> {
     try {
       const response = await axios.post(
         `${this.baseUrl}/authenticate`,
         {
-          accessKey: this.getAccessKey(token),
-          secretKey: this.getSecretKey(token),
+          accessKey: this.getAccessKey(paymentKey),
+          secretKey: this.getSecretKey(paymentKey),
         },
         {
           headers: {
@@ -50,8 +50,8 @@ export class PayOneXStrategy implements IPaymentGateway {
 
       if (response.data.success && response.data.data?.token) {
         // อัพเดต paymentKey ใน database ด้วย token ใหม่
-        await this.prisma.token.update({
-          where: { uuid: token.uuid },
+        await this.prisma.paymentKey.update({
+          where: { id: paymentKey.id },
           data: { paymentKey: response.data.data.token },
         });
 
@@ -77,32 +77,65 @@ export class PayOneXStrategy implements IPaymentGateway {
         `Input bankCode: "${bankCode}" (type: ${typeof bankCode})`
       );
 
-      // หาข้อมูล bank จาก bank_info table
-      const bankInfo = await this.prisma.bankInfo.findFirst({
-        where: {
-          bankCode: bankCode,
-        },
-      });
+      // ตรวจสอบว่าเป็นตัวเลขหรือตัวอักษร
+      const isNumeric = /^\d+$/.test(bankCode);
 
-      this.logger.log(
-        `Found bankInfo:`,
-        bankInfo
-          ? {
-              id: bankInfo.id,
-              bankName: bankInfo.bankName,
-              bankCode: bankInfo.bankCode,
-              centralCode: bankInfo.centralCode,
-              bibCode: bankInfo.bibCode,
-              payonexCode: bankInfo.payonexCode,
-            }
-          : "null"
-      );
+      if (isNumeric) {
+        // ถ้าเป็นตัวเลข (004) → หาจาก bankCode และแปลงเป็น payonexCode
+        const bankInfo = await this.prisma.bankInfo.findFirst({
+          where: {
+            bankCode: bankCode,
+          },
+        });
 
-      if (bankInfo && bankInfo.payonexCode) {
         this.logger.log(
-          `✅ Bank code converted: ${bankCode} → ${bankInfo.payonexCode}`
+          `Found bankInfo:`,
+          bankInfo
+            ? {
+                id: bankInfo.id,
+                bankName: bankInfo.bankName,
+                bankCode: bankInfo.bankCode,
+                centralCode: bankInfo.centralCode,
+                bibCode: bankInfo.bibCode,
+                payonexCode: bankInfo.payonexCode,
+              }
+            : "null"
         );
-        return bankInfo.payonexCode;
+
+        if (bankInfo && bankInfo.payonexCode) {
+          this.logger.log(
+            `✅ Bank code converted: ${bankCode} → ${bankInfo.payonexCode}`
+          );
+          return bankInfo.payonexCode;
+        }
+      } else {
+        // ถ้าเป็นตัวอักษร (KBANK) → หาจาก payonexCode และใช้เดิม
+        const bankInfo = await this.prisma.bankInfo.findFirst({
+          where: {
+            payonexCode: bankCode,
+          },
+        });
+
+        this.logger.log(
+          `Found bankInfo:`,
+          bankInfo
+            ? {
+                id: bankInfo.id,
+                bankName: bankInfo.bankName,
+                bankCode: bankInfo.bankCode,
+                centralCode: bankInfo.centralCode,
+                bibCode: bankInfo.bibCode,
+                payonexCode: bankInfo.payonexCode,
+              }
+            : "null"
+        );
+
+        if (bankInfo) {
+          this.logger.log(
+            `✅ Bank code validated: ${bankCode} is supported by PayOneX`
+          );
+          return bankCode; // ใช้เดิม
+        }
       }
 
       // ถ้าไม่เจอ ให้ throw error
@@ -195,8 +228,23 @@ export class PayOneXStrategy implements IPaymentGateway {
     try {
       this.logger.log(`Creating PayOneX deposit with ref: ${payload.refCode}`);
 
-      // 1. Authenticate
-      const authToken = await this.authenticate(token);
+      // 1. ดึงข้อมูล PaymentKey
+      const paymentKey = await this.prisma.paymentKey.findFirst({
+        where: {
+          token: token.uuid,
+          paymentSys: "payonex",
+        },
+      });
+
+      if (!paymentKey) {
+        return {
+          success: false,
+          message: "PaymentKey not found for PayOneX",
+        };
+      }
+
+      // 2. Authenticate
+      const authToken = await this.authenticate(paymentKey);
       if (!authToken) {
         return {
           success: false,
@@ -292,8 +340,23 @@ export class PayOneXStrategy implements IPaymentGateway {
     try {
       this.logger.log(`Creating PayOneX withdraw with ref: ${payload.refCode}`);
 
-      // 1. Authenticate
-      const authToken = await this.authenticate(token);
+      // 1. ดึงข้อมูล PaymentKey
+      const paymentKey = await this.prisma.paymentKey.findFirst({
+        where: {
+          token: token.uuid,
+          paymentSys: "payonex",
+        },
+      });
+
+      if (!paymentKey) {
+        return {
+          success: false,
+          message: "PaymentKey not found for PayOneX",
+        };
+      }
+
+      // 2. Authenticate
+      const authToken = await this.authenticate(paymentKey);
       if (!authToken) {
         return {
           success: false,
@@ -461,7 +524,22 @@ export class PayOneXStrategy implements IPaymentGateway {
 
   async getBalance(token: any): Promise<any> {
     try {
-      const authToken = await this.authenticate(token);
+      // ดึงข้อมูล PaymentKey
+      const paymentKey = await this.prisma.paymentKey.findFirst({
+        where: {
+          token: token.uuid,
+          paymentSys: "payonex",
+        },
+      });
+
+      if (!paymentKey) {
+        return {
+          success: false,
+          message: "PaymentKey not found for PayOneX",
+        };
+      }
+
+      const authToken = await this.authenticate(paymentKey);
       if (!authToken) {
         return {
           success: false,

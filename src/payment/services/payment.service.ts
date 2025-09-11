@@ -25,9 +25,9 @@ export class PaymentService {
     try {
       this.logger.log(`Creating deposit with ref: ${payload.refCode}`);
 
-      // ตรวจสอบ token และ payment_sys
-      const token = await prisma.token.findUnique({
-        where: { uuid: tokenUuid },
+      // ตรวจสอบ token และ payment_sys จากตาราง bo_token
+      const token = await prisma.boToken.findUnique({
+        where: { token: tokenUuid },
       });
 
       if (!token) {
@@ -83,13 +83,15 @@ export class PaymentService {
       this.logger.log(`=== Sending to Payment Gateway ===`);
       this.logger.log(`Gateway Type: ${token.paymentSys}`);
       this.logger.log(`Payload: ${JSON.stringify(payload, null, 2)}`);
-      this.logger.log(`Token UUID: ${token.uuid}`);
+      this.logger.log(`Token UUID: ${token.token}`);
       this.logger.log(`Payment Key: ${(token as any).paymentKey || "NOT SET"}`);
       this.logger.log(`Payment Secret: ${(token as any).paymentSecret}`);
       this.logger.log(`================================`);
 
       // Call external payment gateway ก่อน
-      const gatewayResponse = await gateway.createDeposit(payload, token);
+      const gatewayResponse = await gateway.createDeposit(payload, {
+        uuid: token.token,
+      });
 
       if (gatewayResponse.success) {
         // สร้าง record ใน database เมื่อ Payment Gateway success
@@ -147,9 +149,9 @@ export class PaymentService {
     try {
       this.logger.log(`Creating withdraw with ref: ${payload.refCode}`);
 
-      // ตรวจสอบ token และ payment_sys
-      const token = await prisma.token.findUnique({
-        where: { uuid: tokenUuid },
+      // ตรวจสอบ token และ payment_sys จากตาราง bo_token
+      const token = await prisma.boToken.findUnique({
+        where: { token: tokenUuid },
       });
 
       if (!token) {
@@ -205,13 +207,15 @@ export class PaymentService {
       this.logger.log(`=== Sending to Payment Gateway (Withdraw) ===`);
       this.logger.log(`Gateway Type: ${token.paymentSys}`);
       this.logger.log(`Payload: ${JSON.stringify(payload, null, 2)}`);
-      this.logger.log(`Token UUID: ${token.uuid}`);
+      this.logger.log(`Token UUID: ${token.token}`);
       this.logger.log(`Payment Key: ${(token as any).paymentKey || "NOT SET"}`);
       this.logger.log(`Payment Secret: ${(token as any).paymentSecret}`);
       this.logger.log(`================================`);
 
       // Call external payment gateway ก่อน
-      const gatewayResponse = await gateway.createWithdraw(payload, token);
+      const gatewayResponse = await gateway.createWithdraw(payload, {
+        uuid: token.token,
+      });
 
       // Log response จาก Payment Gateway
       this.logger.log(`=== Payment Gateway Response (Withdraw) ===`);
@@ -555,9 +559,9 @@ export class PaymentService {
 
   async getBalance(tokenUuid: string): Promise<any> {
     try {
-      // ตรวจสอบ token และ payment_sys
-      const token = await prisma.token.findUnique({
-        where: { uuid: tokenUuid },
+      // ตรวจสอบ token และ payment_sys จากตาราง bo_token
+      const token = await prisma.boToken.findUnique({
+        where: { token: tokenUuid },
       });
 
       if (!token) {
@@ -579,7 +583,9 @@ export class PaymentService {
 
       // Call external payment gateway to get balance
       // This will be implemented in each strategy
-      const balanceResponse = await (gateway as any).getBalance(token);
+      const balanceResponse = await (gateway as any).getBalance({
+        uuid: token.token,
+      });
 
       return {
         success: true,

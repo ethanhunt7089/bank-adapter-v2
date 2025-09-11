@@ -23,13 +23,13 @@ export class BibPayStrategy implements IPaymentGateway {
     private readonly prisma: PrismaService
   ) {}
 
-  // ใช้ keys จาก Token ที่ส่งมา
-  private getApiKey(token: any): string {
-    return token.paymentKey;
+  // ใช้ keys จาก PaymentKey ที่ส่งมา
+  private getApiKey(paymentKey: any): string {
+    return paymentKey.paymentKey;
   }
 
-  private getSecretKey(token: any): string {
-    return token.paymentSecret;
+  private getSecretKey(paymentKey: any): string {
+    return paymentKey.paymentSecret;
   }
 
   // ตรวจสอบ bank code ว่ามีใน BibPay หรือไม่
@@ -86,7 +86,22 @@ export class BibPayStrategy implements IPaymentGateway {
     token: any
   ): Promise<DepositResponse> {
     try {
-      // ตรวจสอบ bank code ก่อน
+      // 1. ดึงข้อมูล PaymentKey
+      const paymentKey = await this.prisma.paymentKey.findFirst({
+        where: {
+          token: token.uuid,
+          paymentSys: "bibpay",
+        },
+      });
+
+      if (!paymentKey) {
+        return {
+          success: false,
+          message: "PaymentKey not found for BibPay",
+        };
+      }
+
+      // 2. ตรวจสอบ bank code ก่อน
       const bibpayBankCode = await this.validateBankCodeForBibPay(
         payload.bankCode
       );
@@ -100,8 +115,8 @@ export class BibPayStrategy implements IPaymentGateway {
         amount: payload.amount.toString(),
       };
 
-      // สร้าง signature สำหรับ BIB-Pay
-      const signature = this.generateSignature(bibpayPayload, token);
+      // 3. สร้าง signature สำหรับ BIB-Pay
+      const signature = this.generateSignature(bibpayPayload, paymentKey);
 
       // เพิ่ม signature เข้าไปใน payload
       (bibpayPayload as any).signatrure = signature;
@@ -111,7 +126,7 @@ export class BibPayStrategy implements IPaymentGateway {
       console.log(`URL: ${this.baseUrl}/api/v1/mc/payin`);
       console.log(`Payload:`, JSON.stringify(bibpayPayload, null, 2));
       console.log(`Headers:`, {
-        "x-api-key": this.getApiKey(token),
+        "x-api-key": this.getApiKey(paymentKey),
         "Content-Type": "application/json",
       });
       console.log(`Signature: ${signature}`);
@@ -122,7 +137,7 @@ export class BibPayStrategy implements IPaymentGateway {
         bibpayPayload,
         {
           headers: {
-            "x-api-key": this.getApiKey(token),
+            "x-api-key": this.getApiKey(paymentKey),
             "Content-Type": "application/json",
           },
         }
@@ -182,7 +197,22 @@ export class BibPayStrategy implements IPaymentGateway {
     token: any
   ): Promise<WithdrawResponse> {
     try {
-      // ตรวจสอบ bank code ก่อน
+      // 1. ดึงข้อมูล PaymentKey
+      const paymentKey = await this.prisma.paymentKey.findFirst({
+        where: {
+          token: token.uuid,
+          paymentSys: "bibpay",
+        },
+      });
+
+      if (!paymentKey) {
+        return {
+          success: false,
+          message: "PaymentKey not found for BibPay",
+        };
+      }
+
+      // 2. ตรวจสอบ bank code ก่อน
       const bibpayBankCode = await this.validateBankCodeForBibPay(
         payload.bankCode
       );
@@ -196,8 +226,8 @@ export class BibPayStrategy implements IPaymentGateway {
         amount: payload.amount.toString(),
       };
 
-      // สร้าง signature สำหรับ BIB-Pay
-      const signature = this.generateSignature(bibpayPayload, token);
+      // 3. สร้าง signature สำหรับ BIB-Pay
+      const signature = this.generateSignature(bibpayPayload, paymentKey);
 
       // เพิ่ม signature เข้าไปใน payload
       (bibpayPayload as any).signatrure = signature;
@@ -207,7 +237,7 @@ export class BibPayStrategy implements IPaymentGateway {
       console.log(`URL: ${this.baseUrl}/api/v1/mc/payout`);
       console.log(`Payload:`, JSON.stringify(bibpayPayload, null, 2));
       console.log(`Headers:`, {
-        "x-api-key": this.getApiKey(token),
+        "x-api-key": this.getApiKey(paymentKey),
         "Content-Type": "application/json",
       });
       console.log(`Signature: ${signature}`);
@@ -218,7 +248,7 @@ export class BibPayStrategy implements IPaymentGateway {
         bibpayPayload,
         {
           headers: {
-            "x-api-key": this.getApiKey(token),
+            "x-api-key": this.getApiKey(paymentKey),
             "Content-Type": "application/json",
           },
         }
@@ -276,21 +306,36 @@ export class BibPayStrategy implements IPaymentGateway {
     return GatewayType.BIBPAY;
   }
 
-  private generateSignature(payload: any, token: any): string {
+  private generateSignature(payload: any, paymentKey: any): string {
     const jwt = require("jsonwebtoken");
-    const secret = this.getSecretKey(token);
+    const secret = this.getSecretKey(paymentKey);
     const jwtToken = jwt.sign(payload, secret);
     return jwtToken;
   }
 
   async getBalance(token: any): Promise<any> {
     try {
+      // ดึงข้อมูล PaymentKey
+      const paymentKey = await this.prisma.paymentKey.findFirst({
+        where: {
+          token: token.uuid,
+          paymentSys: "bibpay",
+        },
+      });
+
+      if (!paymentKey) {
+        return {
+          success: false,
+          message: "PaymentKey not found for BibPay",
+        };
+      }
+
       const response = await axios.post(
         `${this.balanceUrl}/api/v1/mc/balance`,
         {},
         {
           headers: {
-            "x-api-key": this.getApiKey(token),
+            "x-api-key": this.getApiKey(paymentKey),
             "Content-Type": "application/json",
           },
         }

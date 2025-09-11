@@ -154,3 +154,37 @@ model BankInfo {
   @@index([payonexCode], name: "idx_bank_payonex_code")
   @@map("bank_info")
 }
+
+model BoToken {
+  id           Int      @id @default(autoincrement())
+  targetDomain String   @map("target_domain") @db.VarChar(500)
+  token        String   @unique @map("token") @db.Uuid
+  isActive     Boolean  @default(true) @map("is_active")
+  withdraw     Boolean  @default(false)
+  deposit      Boolean  @default(false)
+  paymentSys   String?  @map("payment_sys") @db.VarChar(20)
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+  
+  paymentKeys  PaymentKey[]
+  
+  @@map("bo_token")
+}
+
+model PaymentKey {
+  id            Int      @id @default(autoincrement())
+  token         String   @map("token") @db.Uuid
+  paymentSys    String   @map("payment_sys") @db.VarChar(20)
+  paymentKey    String?  @map("payment_key") @db.VarChar(100)
+  paymentSecret String?  @map("payment_secret") @db.VarChar(100)
+  paymentAccess String?  @map("payment_access") @db.VarChar(100)
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+  
+  boToken BoToken @relation(fields: [token], references: [token])
+  
+  @@unique([token, paymentSys], name: "unique_token_payment_sys")
+  @@index([token], name: "idx_payment_key_token")
+  @@index([paymentSys], name: "idx_payment_key_payment_sys")
+  @@map("payment_key")
+}

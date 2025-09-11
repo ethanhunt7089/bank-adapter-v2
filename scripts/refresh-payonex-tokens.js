@@ -14,13 +14,15 @@ async function refreshPayOneXTokens() {
   console.log(`Timestamp: ${new Date().toISOString()}`);
 
   try {
-    // หา tokens ทั้งหมดที่เป็น PayOneX และ active
-    const payonexTokens = await prisma.token.findMany({
+    // หา PaymentKey ทั้งหมดที่เป็น PayOneX
+    const payonexTokens = await prisma.paymentKey.findMany({
       where: {
         paymentSys: "payonex",
-        isActive: true,
         paymentAccess: { not: null },
         paymentSecret: { not: null },
+      },
+      include: {
+        boToken: true,
       },
     });
 
@@ -36,9 +38,9 @@ async function refreshPayOneXTokens() {
     const results = [];
 
     // Process each token
-    for (const token of payonexTokens) {
+    for (const paymentKey of payonexTokens) {
       console.log(
-        `\n--- Processing token for domain: ${token.targetDomain} ---`
+        `\n--- Processing token for domain: ${paymentKey.boToken.targetDomain} ---`
       );
 
       try {
@@ -46,8 +48,8 @@ async function refreshPayOneXTokens() {
         const response = await axios.post(
           "https://api.payonex.asia/authenticate",
           {
-            accessKey: token.paymentAccess,
-            secretKey: token.paymentSecret,
+            accessKey: paymentKey.paymentAccess,
+            secretKey: paymentKey.paymentSecret,
           },
           {
             headers: {
@@ -79,8 +81,8 @@ async function refreshPayOneXTokens() {
           const newToken = response.data.data.TOKEN;
 
           // Update token in database
-          await prisma.token.update({
-            where: { id: token.id },
+          await prisma.paymentKey.update({
+            where: { id: paymentKey.id },
             data: {
               paymentKey: newToken,
               updatedAt: new Date(),
@@ -88,30 +90,30 @@ async function refreshPayOneXTokens() {
           });
 
           console.log(
-            `✅ Token refreshed successfully for ${token.targetDomain}`
+            `✅ Token refreshed successfully for ${paymentKey.boToken.targetDomain}`
           );
           console.log(`New token: ${newToken.substring(0, 20)}...`);
 
           results.push({
-            domain: token.targetDomain,
+            domain: paymentKey.boToken.targetDomain,
             status: "success",
             message: "Token refreshed successfully",
           });
         } else {
           console.error(
-            `❌ PayOneX API returned error for ${token.targetDomain}:`,
+            `❌ PayOneX API returned error for ${paymentKey.boToken.targetDomain}:`,
             response.data
           );
 
           results.push({
-            domain: token.targetDomain,
+            domain: paymentKey.boToken.targetDomain,
             status: "error",
             message: response.data.message || "Unknown API error",
           });
         }
       } catch (error) {
         console.error(
-          `❌ Error refreshing token for ${token.targetDomain}:`,
+          `❌ Error refreshing token for ${paymentKey.boToken.targetDomain}:`,
           error.message
         );
 
@@ -125,8 +127,8 @@ async function refreshPayOneXTokens() {
             `Request payload was:`,
             JSON.stringify(
               {
-                accessKey: token.paymentAccess,
-                secretKey: token.paymentSecret,
+                accessKey: paymentKey.paymentAccess,
+                secretKey: paymentKey.paymentSecret,
               },
               null,
               2
@@ -135,7 +137,7 @@ async function refreshPayOneXTokens() {
         }
 
         results.push({
-          domain: token.targetDomain,
+          domain: paymentKey.boToken.targetDomain,
           status: "error",
           message: error.message,
         });
