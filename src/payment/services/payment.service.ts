@@ -413,25 +413,46 @@ export class PaymentService {
           webhookData.data?.data?.bankName ||
           "";
       } else {
-        // BibPay webhook format
+        // BibPay webhook format (รองรับทั้ง format เก่าและใหม่)
         status =
-          webhookData.data?.data?.status === "completed"
+          webhookData.data?.data?.status === "completed" ||
+          webhookData.data?.status === "completed"
             ? "completed"
             : "pending";
         message =
-          status === "completed" ? null : webhookData.data?.data?.message;
-        transactionId = webhookData.data?.data?.transactionId || "";
+          status === "completed"
+            ? null
+            : webhookData.data?.data?.message || webhookData.data?.message;
+        transactionId =
+          webhookData.data?.data?.transactionId ||
+          webhookData.data?.transactionId ||
+          "";
         // refCode ใช้จาก webhookData.refCode ที่ประกาศไว้แล้ว
-        amount = webhookData.data?.data?.amount || 0;
-        bankName = webhookData.data?.data?.bank?.name || "";
-        bankCode = webhookData.data?.data?.bank?.code || "";
+        amount =
+          parseFloat(webhookData.data?.data?.amount) ||
+          parseFloat(webhookData.data?.amount) ||
+          0;
+        bankName =
+          webhookData.data?.data?.bank?.name ||
+          webhookData.data?.bank?.name ||
+          "";
+        bankCode =
+          webhookData.data?.data?.bank?.code ||
+          webhookData.data?.data?.bank?.shortCode ||
+          webhookData.data?.bank?.code ||
+          webhookData.data?.bank?.shortCode ||
+          "";
         bankNumber =
           webhookData.data?.data?.bankNumber ||
           webhookData.data?.data?.bnakNumber ||
+          webhookData.data?.bankNumber ||
+          webhookData.data?.bnakNumber ||
           "";
         accountName =
           webhookData.data?.data?.name ||
           webhookData.data?.data?.bankName ||
+          webhookData.data?.name ||
+          webhookData.data?.bankName ||
           "";
       }
 
@@ -471,6 +492,14 @@ export class PaymentService {
 
         if (!isOwnWebhookUrl) {
           try {
+            // Log ข้อมูลที่ส่งไป user callback
+            this.logger.log(`=== Sending to User Callback ===`);
+            this.logger.log(`URL: ${userCallbackUrl}`);
+            this.logger.log(
+              `Data: ${JSON.stringify(userCallbackData, null, 2)}`
+            );
+            this.logger.log(`================================`);
+
             // ส่งข้อมูลไปยัง User's callback_url
             await this.forwardToUserCallback(userCallbackData, userCallbackUrl);
             this.logger.log(
