@@ -112,7 +112,7 @@ export class BibPayStrategy implements IPaymentGateway {
         bankCode: bibpayBankCode, // ใช้ BibPay bank code
         callbackUrl: "https://central-dragon-11.com/bcel-api/webhooks/bibpay", // Hardcode callbackUrl
         refferend: payload.refCode, // เปลี่ยนจาก refCode เป็น refferend
-        amount: payload.amount.toString(),
+        amount: payload.amount, // ✅ ใช้ number แทน string
       };
 
       // 3. สร้าง signature สำหรับ BIB-Pay
@@ -229,7 +229,7 @@ export class BibPayStrategy implements IPaymentGateway {
         bankCode: bibpayBankCode, // ใช้ BibPay bank code
         callbackUrl: "https://central-dragon-11.com/bcel-api/webhooks/bibpay", // Hardcode callbackUrl
         refferend: payload.refCode, // เปลี่ยนจาก refCode เป็น refferend
-        amount: payload.amount.toString(),
+        amount: payload.amount, // ✅ ใช้ number แทน string
       };
 
       // 3. สร้าง signature สำหรับ BIB-Pay

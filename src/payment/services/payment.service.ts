@@ -354,7 +354,7 @@ export class PaymentService {
       });
 
       // 1. แยกแยะ TransactionType (deposit vs withdraw)
-      const refCode = webhookData.refCode;
+      let refCode = webhookData.refCode;
       const depositRecord = await prisma.payment_deposits.findFirst({
         where: { ref_code: refCode },
       });
@@ -371,29 +371,84 @@ export class PaymentService {
         transactionType = "deposit"; // fallback
       }
 
-      // 2. สร้างข้อมูลตาม Format ที่คุณกำหนด
-      const userCallbackData = {
-        status: webhookData.data?.status,
-        message:
-          webhookData.data?.status === "completed"
-            ? null
-            : webhookData.data?.message,
+      // 2. สร้างข้อมูลตาม Format ที่คุณกำหนด (แยกตาม gateway type)
+      let userCallbackData: any;
+
+      // สร้างข้อมูล callback แบบมาตรฐาน (เหมือนกันทั้ง BibPay และ PayOneX)
+      let status = "pending";
+      let message = null;
+      let transactionId = "";
+      let amount = 0;
+      let bankName = "";
+      let bankCode = "";
+      let bankNumber = "";
+      let accountName = "";
+
+      if (webhookData.gatewayType === "payonex") {
+        // PayOneX webhook format
+        status =
+          webhookData.data?.status === "SUCCESS" ? "completed" : "pending";
+        message = status === "completed" ? null : webhookData.data?.message;
+        transactionId =
+          webhookData.data?.uuid || webhookData.data?.data?.transactionId || "";
+        // refCode ใช้จาก webhookData.refCode ที่ประกาศไว้แล้ว
+        amount =
+          webhookData.data?.amount || webhookData.data?.data?.amount || 0;
+        bankName =
+          webhookData.data?.accountName ||
+          webhookData.data?.data?.bank?.name ||
+          "";
+        bankCode =
+          webhookData.data?.bankCode ||
+          webhookData.data?.data?.bank?.code ||
+          "";
+        bankNumber =
+          webhookData.data?.accountNo ||
+          webhookData.data?.data?.bankNumber ||
+          webhookData.data?.data?.bnakNumber ||
+          "";
+        accountName =
+          webhookData.data?.accountName ||
+          webhookData.data?.data?.name ||
+          webhookData.data?.data?.bankName ||
+          "";
+      } else {
+        // BibPay webhook format
+        status =
+          webhookData.data?.data?.status === "completed"
+            ? "completed"
+            : "pending";
+        message =
+          status === "completed" ? null : webhookData.data?.data?.message;
+        transactionId = webhookData.data?.data?.transactionId || "";
+        // refCode ใช้จาก webhookData.refCode ที่ประกาศไว้แล้ว
+        amount = webhookData.data?.data?.amount || 0;
+        bankName = webhookData.data?.data?.bank?.name || "";
+        bankCode = webhookData.data?.data?.bank?.code || "";
+        bankNumber =
+          webhookData.data?.data?.bankNumber ||
+          webhookData.data?.data?.bnakNumber ||
+          "";
+        accountName =
+          webhookData.data?.data?.name ||
+          webhookData.data?.data?.bankName ||
+          "";
+      }
+
+      userCallbackData = {
+        status: status,
+        message: message,
         data: {
           transactionType: transactionType,
-          transactionId: webhookData.data?.data?.transactionId,
-          refCode:
-            webhookData.data?.data?.refferend ||
-            webhookData.data?.data?.reference,
-          amount: webhookData.data?.data?.amount,
+          transactionId: transactionId,
+          refCode: refCode, // ใช้ refCode จาก webhookData.refCode
+          amount: amount,
           bank: {
-            name: webhookData.data?.data?.bank?.name,
-            code: webhookData.data?.data?.bank?.code,
+            name: bankName,
+            code: bankCode,
           },
-          bankNumber:
-            webhookData.data?.data?.bankNumber ||
-            webhookData.data?.data?.bnakNumber,
-          accountName:
-            webhookData.data?.data?.name || webhookData.data?.data?.bankName,
+          bankNumber: bankNumber,
+          accountName: accountName,
         },
       };
 
@@ -406,10 +461,15 @@ export class PaymentService {
           depositRecord?.callback_url || withdrawRecord?.callback_url;
 
         // ตรวจสอบว่าไม่ใช่ URL ของตัวเอง เพื่อป้องกัน loop
-        if (
-          userCallbackUrl !==
-          "https://central-dragon-11.com/bcel-api/webhooks/bibpay"
-        ) {
+        const isOwnWebhookUrl =
+          (webhookData.gatewayType === "bibpay" &&
+            userCallbackUrl ===
+              "https://central-dragon-11.com/bcel-api/webhooks/bibpay") ||
+          (webhookData.gatewayType === "payonex" &&
+            userCallbackUrl ===
+              "https://central-dragon-11.com/bcel-api/webhooks/payonex");
+
+        if (!isOwnWebhookUrl) {
           try {
             // ส่งข้อมูลไปยัง User's callback_url
             await this.forwardToUserCallback(userCallbackData, userCallbackUrl);
@@ -439,20 +499,36 @@ export class PaymentService {
       );
       this.logger.log(`================================`);
 
-      // อัพเดท deposit status ถ้าเป็น deposit webhook
-      if (
-        transactionType === "deposit" &&
-        (webhookData.data?.data?.status === "completed" ||
-          webhookData.data?.data?.status === "success" ||
-          webhookData.data?.data?.status === true ||
-          webhookData.data?.data?.status === "paid" ||
-          webhookData.data?.data?.status === "confirmed" ||
-          webhookData.data?.status === "completed" ||
-          webhookData.data?.status === "success" ||
-          webhookData.data?.status === true ||
-          webhookData.data?.status === "paid" ||
-          webhookData.data?.status === "confirmed")
-      ) {
+      // อัพเดท deposit status ถ้าเป็น deposit webhook (แยกตาม gateway type)
+      let shouldUpdateDeposit = false;
+
+      if (transactionType === "deposit") {
+        if (webhookData.gatewayType === "payonex") {
+          // PayOneX status check
+          shouldUpdateDeposit =
+            webhookData.data?.status === "SUCCESS" ||
+            webhookData.data?.status === "completed" ||
+            webhookData.data?.status === "success" ||
+            webhookData.data?.status === true ||
+            webhookData.data?.status === "paid" ||
+            webhookData.data?.status === "confirmed";
+        } else {
+          // BibPay status check (เดิม)
+          shouldUpdateDeposit =
+            webhookData.data?.data?.status === "completed" ||
+            webhookData.data?.data?.status === "success" ||
+            webhookData.data?.data?.status === true ||
+            webhookData.data?.data?.status === "paid" ||
+            webhookData.data?.data?.status === "confirmed" ||
+            webhookData.data?.status === "completed" ||
+            webhookData.data?.status === "success" ||
+            webhookData.data?.status === true ||
+            webhookData.data?.status === "paid" ||
+            webhookData.data?.status === "confirmed";
+        }
+      }
+
+      if (shouldUpdateDeposit) {
         try {
           await prisma.payment_deposits.updateMany({
             where: {
