@@ -72,6 +72,21 @@ export class PaymentChannelsService {
     try {
       // Validation: ถ้า type เป็น payment_gateway ต้องมี payment_sys
       if (dto.type === "payment_gateway") {
+        // ตรวจสอบว่ามี payment_gateway อยู่แล้วหรือไม่
+        const existingPaymentGateway =
+          await this.prisma.paymentChannel.findFirst({
+            where: {
+              tokenUuid: tokenUuid,
+              type: "payment_gateway",
+            },
+          });
+
+        if (existingPaymentGateway) {
+          throw new BadRequestException(
+            "Payment gateway already exists. Only one payment gateway is allowed per token."
+          );
+        }
+
         if (!dto.payment_sys) {
           throw new BadRequestException(
             "payment_sys is required for payment_gateway type"
