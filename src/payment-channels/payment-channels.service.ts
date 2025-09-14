@@ -70,6 +70,10 @@ export class PaymentChannelsService {
     tokenUuid: string
   ): Promise<CreatePaymentChannelResponseDto> {
     try {
+      console.log("=== Create Payment Channel Debug ===");
+      console.log("DTO:", JSON.stringify(dto, null, 2));
+      console.log("TokenUuid:", tokenUuid);
+      console.log("================================");
       // Validation: ถ้า type เป็น payment_gateway ต้องมี payment_sys
       if (dto.type === "payment_gateway") {
         // ตรวจสอบว่ามี payment_gateway อยู่แล้วหรือไม่
@@ -124,6 +128,18 @@ export class PaymentChannelsService {
       }
 
       // สร้าง payment channel ใหม่
+      console.log("Creating payment channel with data:", {
+        type: dto.type,
+        bankCode: dto.type === "payment_gateway" ? null : dto.bankCode,
+        bankNo: dto.type === "payment_gateway" ? null : dto.bankNo,
+        bankName: dto.type === "payment_gateway" ? null : dto.bankName,
+        paymentSys: dto.type === "payment_gateway" ? dto.payment_sys : null,
+        enable: dto.enable,
+        autoDeposit: dto.autoDeposit,
+        autoWithdraw: dto.autoWithdraw,
+        tokenUuid: tokenUuid,
+      });
+
       const newChannel = await this.prisma.paymentChannel.create({
         data: {
           type: dto.type,
@@ -137,6 +153,8 @@ export class PaymentChannelsService {
           tokenUuid: tokenUuid,
         },
       });
+
+      console.log("Payment channel created successfully:", newChannel);
 
       const channelData: PaymentChannelDataDto = {
         id: newChannel.id,
@@ -155,6 +173,13 @@ export class PaymentChannelsService {
         data: channelData,
       };
     } catch (error) {
+      console.error("=== Create Payment Channel Error ===");
+      console.error("Error:", error);
+      console.error("Error message:", error.message);
+      console.error("Error stack:", error.stack);
+      console.error("Error name:", error.name);
+      console.error("================================");
+
       if (error instanceof BadRequestException) {
         return {
           success: false,

@@ -62,8 +62,8 @@ export class PaymentChannelsController {
     }
 
     // ตรวจสอบว่า token valid หรือไม่
-    const { isTokenValid } = await import("../lib/token-utils");
-    const isValid = await isTokenValid(uuid);
+    const { isBoTokenValid } = await import("../lib/bo-token-utils");
+    const isValid = await isBoTokenValid(uuid);
 
     if (!isValid) {
       throw new HttpException(
