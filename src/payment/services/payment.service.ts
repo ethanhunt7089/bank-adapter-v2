@@ -395,7 +395,9 @@ export class PaymentService {
           webhookData.data?.uuid || webhookData.data?.data?.transactionId || "";
         // refCode ใช้จาก webhookData.refCode ที่ประกาศไว้แล้ว
         amount =
-          webhookData.data?.amount || webhookData.data?.data?.amount || 0;
+          parseFloat(webhookData.data?.transferAmount) ||
+          parseFloat(webhookData.data?.data?.transferAmount) ||
+          0;
         bankName =
           webhookData.data?.accountName ||
           webhookData.data?.data?.bank?.name ||
@@ -431,8 +433,8 @@ export class PaymentService {
           "";
         // refCode ใช้จาก webhookData.refCode ที่ประกาศไว้แล้ว
         amount =
-          parseFloat(webhookData.data?.data?.amount) ||
-          parseFloat(webhookData.data?.amount) ||
+          parseFloat(webhookData.data?.depositAmount) ||
+          parseFloat(webhookData.data?.data?.depositAmount) ||
           0;
         bankName =
           webhookData.data?.data?.bank?.name ||

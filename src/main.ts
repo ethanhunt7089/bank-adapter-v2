@@ -50,22 +50,11 @@ async function bootstrap() {
     customCss: ".swagger-ui .topbar { display: none }",
   });
 
-  // เปิด CORS เพื่อให้ frontend สามารถเรียก API ได้
+  // เปิด CORS หมดก่อน
   app.enableCors({
-    origin: [
-      "https://demo.bnk168.net",
-      "http://demo.bnk168.net",
-      "https://bnk168.net",
-      "http://localhost:3000", // สำหรับ development
-      "http://localhost:5173", // สำหรับ Vite dev server
-    ],
+    origin: true, // อนุญาตทุก origin
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-    allowedHeaders: [
-      "Content-Type",
-      "Authorization",
-      "Accept",
-      "x-api-key", // ← เพิ่มบรรทัดนี้
-    ],
+    allowedHeaders: ["Content-Type", "Authorization", "Accept", "x-api-key"],
     credentials: true,
   });
 
