@@ -117,6 +117,7 @@ export class PaymentService {
             qr_code: gatewayResponse.qrcodeUrl,
             gateway_transaction_id: gatewayResponse.paymentTrx,
             gateway_response: gatewayResponse.gatewayResponse,
+            token: token.token,
             created_at: new Date(),
             updated_at: new Date(),
           },
@@ -274,6 +275,7 @@ export class PaymentService {
             status: PaymentStatus.PENDING,
             gateway_transaction_id: gatewayResponse.paymentTrx,
             gateway_response: gatewayResponse.gatewayResponse,
+            token: token.token,
             created_at: new Date(),
             updated_at: new Date(),
           },
@@ -501,7 +503,12 @@ export class PaymentService {
             this.logger.log(`================================`);
 
             // ส่งข้อมูลไปยัง User's callback_url
-            await this.forwardToUserCallback(userCallbackData, userCallbackUrl);
+            const token = depositRecord?.token || withdrawRecord?.token;
+            await this.forwardToUserCallback(
+              userCallbackData,
+              userCallbackUrl,
+              token
+            );
             this.logger.log(
               `Forwarded webhook to user callback: ${userCallbackUrl}`
             );
@@ -721,16 +728,25 @@ export class PaymentService {
   // Method สำหรับ forward webhook ไปยัง User's callback_url
   private async forwardToUserCallback(
     callbackData: any,
-    callbackUrl: string
+    callbackUrl: string,
+    token?: string
   ): Promise<void> {
     try {
       const axios = require("axios");
 
+      // สร้าง headers
+      const headers: any = {
+        "Content-Type": "application/json",
+        "User-Agent": "Bank-Adapter-v2/1.0",
+      };
+
+      // เพิ่ม x-api-key header ถ้ามี token
+      if (token) {
+        headers["x-api-key"] = token;
+      }
+
       const response = await axios.post(callbackUrl, callbackData, {
-        headers: {
-          "Content-Type": "application/json",
-          "User-Agent": "Bank-Adapter-v2/1.0",
-        },
+        headers,
         timeout: 10000, // 10 seconds timeout
       });
 

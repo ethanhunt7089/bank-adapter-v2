@@ -52,9 +52,20 @@ async function bootstrap() {
 
   // เปิด CORS เพื่อให้ frontend สามารถเรียก API ได้
   app.enableCors({
-    origin: true, // อนุญาตทุก origin (สำหรับ development)
+    origin: [
+      "https://demo.bnk168.net",
+      "http://demo.bnk168.net",
+      "https://bnk168.net",
+      "http://localhost:3000", // สำหรับ development
+      "http://localhost:5173", // สำหรับ Vite dev server
+    ],
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization", "Accept"],
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization",
+      "Accept",
+      "x-api-key", // ← เพิ่มบรรทัดนี้
+    ],
     credentials: true,
   });
 
