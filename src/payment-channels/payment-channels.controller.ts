@@ -6,6 +6,7 @@ import {
   Delete,
   Body,
   Request,
+  Param,
   HttpException,
   HttpStatus,
 } from "@nestjs/common";
@@ -160,6 +161,70 @@ export class PaymentChannelsController {
   ): Promise<PaymentChannelsResponseDto> {
     const tokenUuid = await this.extractAndValidateUuid(req);
     return this.paymentChannelsService.getPaymentChannels(tokenUuid);
+  }
+
+  @Get("payment-channels/:id")
+  @ApiOperation({
+    summary: "Get payment channel by ID",
+    description:
+      "Retrieve a specific payment channel by its ID for the authenticated token",
+  })
+  @ApiResponse({
+    status: 200,
+    description: "Successfully retrieved payment channel",
+    content: {
+      "application/json": {
+        example: {
+          success: true,
+          message: null,
+          data: {
+            id: 1,
+            type: "bank_sms",
+            bankCode: "014",
+            bankNo: "1234567890",
+            bankName: "สมชาย ใจดี",
+            enable: true,
+            autoDeposit: true,
+            autoWithdraw: false,
+            payment_sys: null,
+          },
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 404,
+    description: "Payment channel not found",
+    content: {
+      "application/json": {
+        example: {
+          success: false,
+          message: "Payment channel not found",
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 401,
+    description: "Unauthorized - Invalid or missing API Token",
+    content: {
+      "application/json": {
+        example: {
+          success: false,
+          message: "Invalid or inactive API Token",
+        },
+      },
+    },
+  })
+  async getPaymentChannelById(
+    @Param("id") id: string,
+    @Request() req: any
+  ): Promise<CreatePaymentChannelResponseDto> {
+    const tokenUuid = await this.extractAndValidateUuid(req);
+    return this.paymentChannelsService.getPaymentChannelById(
+      parseInt(id),
+      tokenUuid
+    );
   }
 
   @Post("create-payment-channels")

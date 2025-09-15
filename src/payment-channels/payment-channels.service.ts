@@ -65,6 +65,51 @@ export class PaymentChannelsService {
     }
   }
 
+  async getPaymentChannelById(
+    id: number,
+    tokenUuid: string
+  ): Promise<CreatePaymentChannelResponseDto> {
+    try {
+      // ดึง channel ตาม ID และ tokenUuid
+      const channel = await this.prisma.paymentChannel.findFirst({
+        where: {
+          id: id,
+          tokenUuid: tokenUuid,
+        },
+      });
+
+      if (!channel) {
+        return {
+          success: false,
+          message: "Payment channel not found",
+        };
+      }
+
+      const channelData: PaymentChannelDataDto = {
+        id: channel.id,
+        type: channel.type,
+        bankCode: channel.bankCode,
+        bankNo: channel.bankNo,
+        bankName: channel.bankName,
+        enable: channel.enable,
+        autoDeposit: channel.autoDeposit,
+        autoWithdraw: channel.autoWithdraw,
+        payment_sys: channel.paymentSys,
+      };
+
+      return {
+        success: true,
+        message: null,
+        data: channelData,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: "Failed to retrieve payment channel",
+      };
+    }
+  }
+
   async createPaymentChannel(
     dto: CreatePaymentChannelDto,
     tokenUuid: string
@@ -106,12 +151,8 @@ export class PaymentChannelsService {
             `Unsupported payment system: ${dto.payment_sys}`
           );
         }
-        // ต้องไม่มี bank information
-        if (dto.bankCode || dto.bankNo || dto.bankName) {
-          throw new BadRequestException(
-            "Bank information should be null for payment_gateway type"
-          );
-        }
+        // อนุญาตให้ส่ง bank information ได้ (ไม่บังคับ)
+        // Bank information จะถูกเก็บไว้แต่ไม่ใช้ในการประมวลผล payment gateway
       } else {
         // ถ้า type เป็น bank_sms หรือ bank_slip ต้องมี bank information
         if (!dto.bankCode || !dto.bankNo || !dto.bankName) {
