@@ -18,10 +18,12 @@ import {
   ApiHeader,
   ApiBody,
   ApiSecurity,
+  ApiExcludeEndpoint,
 } from "@nestjs/swagger";
 import { PaymentService } from "../services/payment.service";
 import { CreateDepositDto } from "../dto/create-deposit.dto";
 import { CreateWithdrawDto } from "../dto/create-withdraw.dto";
+import { StatusRequestDto } from "../dto/status-request.dto";
 import {
   CreateDepositPayload,
   CreateWithdrawPayload,
@@ -249,6 +251,7 @@ export class PaymentController {
   }
 
   @Get("deposit-status/:refCode")
+  @ApiExcludeEndpoint()
   @ApiSecurity("API Token")
   @ApiOperation({
     summary: "Get deposit status",
@@ -348,7 +351,125 @@ export class PaymentController {
     }
   }
 
+  @Post("deposit-status")
+  @ApiSecurity("API Token")
+  @ApiOperation({
+    summary: "Get deposit status via POST",
+    description: "ดูสถานะธุรกรรมฝากเงินตามรหัสอ้างอิง (POST method)",
+  })
+  @ApiBody({
+    type: StatusRequestDto,
+    description: "ข้อมูลรหัสอ้างอิงสำหรับตรวจสอบสถานะ",
+    examples: {
+      "Deposit Status Request": {
+        summary: "Deposit Status Request",
+        description: "ส่งรหัสอ้างอิงเพื่อตรวจสอบสถานะการฝากเงิน",
+        value: {
+          refCode: "DEP001",
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 200,
+    description: "Deposit status retrieved successfully",
+    content: {
+      "application/json": {
+        example: {
+          success: true,
+          data: {
+            refCode: "DEP001",
+            amount: 100000,
+            depositAmount: 100000,
+            accountName: "John Doe",
+            bankNumber: "1234567890",
+            bankCode: "BCEL",
+            gatewayType: "bibpay",
+            status: "pending",
+            qrcode:
+              "00020101021229370016A000000677010111021308355660444105802TH530376454041.376304A3D8",
+            createdAt: "2024-01-15T10:30:00.000Z",
+            updatedAt: "2024-01-15T10:30:00.000Z",
+            completedAt: null,
+          },
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 401,
+    description: "Unauthorized - Invalid token",
+    content: {
+      "application/json": {
+        example: {
+          statusCode: 401,
+          message: "Missing or invalid authorization header",
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 404,
+    description: "Deposit not found",
+    content: {
+      "application/json": {
+        example: {
+          statusCode: 404,
+          message: "Deposit not found",
+        },
+      },
+    },
+  })
+  async getDepositStatusPost(
+    @Body() statusRequest: StatusRequestDto,
+    @Req() request: Request
+  ) {
+    try {
+      this.logger.log(
+        `Getting deposit status for ref: ${statusRequest.refCode}`
+      );
+
+      const deposit = await this.paymentService.getDepositStatus(
+        statusRequest.refCode
+      );
+
+      if (!deposit) {
+        throw new HttpException("Deposit not found", HttpStatus.NOT_FOUND);
+      }
+
+      return {
+        success: true,
+        data: {
+          refCode: deposit.ref_code,
+          amount: deposit.amount,
+          depositAmount: deposit.deposit_amount,
+          accountName: deposit.account_name,
+          bankNumber: deposit.bank_number,
+          bankCode: deposit.bank_code,
+          gatewayType: deposit.gateway_type,
+          status: deposit.status,
+          qrcode: deposit.qr_code,
+          createdAt: deposit.created_at,
+          updatedAt: deposit.updated_at,
+          completedAt: deposit.completed_at,
+        },
+      };
+    } catch (error) {
+      this.logger.error(`Error getting deposit status: ${error.message}`);
+
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      throw new HttpException(
+        error.message || "Internal server error",
+        HttpStatus.INTERNAL_SERVER_ERROR
+      );
+    }
+  }
+
   @Get("withdraw-status/:refCode")
+  @ApiExcludeEndpoint()
   @ApiSecurity("API Token")
   @ApiOperation({
     summary: "Get withdraw status",
@@ -409,6 +530,118 @@ export class PaymentController {
       this.logger.log(`Getting withdraw status for ref: ${refCode}`);
 
       const withdraw = await this.paymentService.getWithdrawStatus(refCode);
+
+      if (!withdraw) {
+        throw new HttpException("Withdraw not found", HttpStatus.NOT_FOUND);
+      }
+
+      return {
+        success: true,
+        data: {
+          refCode: withdraw.ref_code,
+          amount: withdraw.amount,
+          accountName: withdraw.account_name,
+          bankNumber: withdraw.bank_number,
+          bankCode: withdraw.bank_code,
+          gatewayType: withdraw.gateway_type,
+          status: withdraw.status,
+          createdAt: withdraw.created_at,
+          updatedAt: withdraw.updated_at,
+          completedAt: withdraw.completed_at,
+        },
+      };
+    } catch (error) {
+      this.logger.error(`Error getting withdraw status: ${error.message}`);
+
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      throw new HttpException(
+        error.message || "Internal server error",
+        HttpStatus.INTERNAL_SERVER_ERROR
+      );
+    }
+  }
+
+  @Post("withdraw-status")
+  @ApiSecurity("API Token")
+  @ApiOperation({
+    summary: "Get withdraw status via POST",
+    description: "ดูสถานะธุรกรรมถอนเงินตามรหัสอ้างอิง (POST method)",
+  })
+  @ApiBody({
+    type: StatusRequestDto,
+    description: "ข้อมูลรหัสอ้างอิงสำหรับตรวจสอบสถานะ",
+    examples: {
+      "Withdraw Status Request": {
+        summary: "Withdraw Status Request",
+        description: "ส่งรหัสอ้างอิงเพื่อตรวจสอบสถานะการถอนเงิน",
+        value: {
+          refCode: "WIT001",
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 200,
+    description: "Withdraw status retrieved successfully",
+    content: {
+      "application/json": {
+        example: {
+          success: true,
+          data: {
+            refCode: "WIT001",
+            amount: 50000,
+            accountName: "Jane Doe",
+            bankNumber: "0987654321",
+            bankCode: "BCEL",
+            gatewayType: "bibpay",
+            status: "pending",
+            createdAt: "2024-01-15T10:30:00.000Z",
+            updatedAt: "2024-01-15T10:30:00.000Z",
+            completedAt: null,
+          },
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 401,
+    description: "Unauthorized - Invalid token",
+    content: {
+      "application/json": {
+        example: {
+          statusCode: 401,
+          message: "Missing or invalid authorization header",
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 404,
+    description: "Withdraw not found",
+    content: {
+      "application/json": {
+        example: {
+          statusCode: 404,
+          message: "Withdraw not found",
+        },
+      },
+    },
+  })
+  async getWithdrawStatusPost(
+    @Body() statusRequest: StatusRequestDto,
+    @Req() request: Request
+  ) {
+    try {
+      this.logger.log(
+        `Getting withdraw status for ref: ${statusRequest.refCode}`
+      );
+
+      const withdraw = await this.paymentService.getWithdrawStatus(
+        statusRequest.refCode
+      );
 
       if (!withdraw) {
         throw new HttpException("Withdraw not found", HttpStatus.NOT_FOUND);
