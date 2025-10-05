@@ -474,6 +474,7 @@ export class PaymentService {
           },
           bankNumber: bankNumber,
           accountName: accountName,
+          paymentBrand: webhookData.gatewayType, // เพิ่ม paymentBrand
         },
       };
 
