@@ -16,7 +16,7 @@ async function bootstrap() {
     .setTitle("Central Bank API")
     .setDescription("Central Bank API - Authentication & Banking Gateway")
     .setVersion("1.0.0")
-    .addServer("https://central-dragon-11.com/bcel-api", "Production") // เพิ่ม server URL
+    //.addServer("https://central-dragon-11.com/bcel-api", "Production") // เพิ่ม server URL
     // ไม่ fix server base URL เพื่อให้ Swagger ใช้ relative path ตรงกับแอป (ไม่มี /bcel-api)
     .addApiKey(
       {

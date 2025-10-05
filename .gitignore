@@ -45,3 +45,6 @@ prisma/dev.db-journal
 
 # Docker
 .dockerignore
+
+backup.sql
+bank-adapter-backup.zip
