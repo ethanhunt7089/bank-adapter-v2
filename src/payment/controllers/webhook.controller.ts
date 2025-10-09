@@ -1,4 +1,12 @@
-import { Controller, Post, Body, Logger } from "@nestjs/common";
+import {
+  Controller,
+  Post,
+  Get,
+  Body,
+  Query,
+  Logger,
+  HttpCode,
+} from "@nestjs/common";
 import { ApiExcludeController } from "@nestjs/swagger";
 import { PaymentService } from "../services/payment.service";
 
@@ -176,5 +184,37 @@ export class WebhookController {
       message: "Test webhook received and logged successfully",
       received: webhookData,
     };
+  }
+
+  // TrueMoney Webhook - POST Method
+  @Post("true-money/webhook")
+  @HttpCode(200)
+  async handleTrueMoneyWebhookPost(@Body() webhookData: any) {
+    this.logger.log("=== TrueMoney Webhook (POST) Received ===");
+    this.logger.log(`Timestamp: ${new Date().toISOString()}`);
+    this.logger.log(`Method: POST`);
+    this.logger.log(`JSON Body: ${JSON.stringify(webhookData, null, 2)}`);
+    this.logger.log(`Body Type: ${typeof webhookData}`);
+    this.logger.log(`Body Keys: ${Object.keys(webhookData || {}).join(", ")}`);
+    this.logger.log("=== End TrueMoney Webhook (POST) ===");
+
+    // Return empty response with status 200
+    return;
+  }
+
+  // TrueMoney Webhook - GET Method
+  @Get("true-money/webhook")
+  @HttpCode(200)
+  async handleTrueMoneyWebhookGet(@Query() queryParams: any) {
+    this.logger.log("=== TrueMoney Webhook (GET) Received ===");
+    this.logger.log(`Timestamp: ${new Date().toISOString()}`);
+    this.logger.log(`Method: GET`);
+    this.logger.log(`Query String: ${JSON.stringify(queryParams, null, 2)}`);
+    this.logger.log(`Query Type: ${typeof queryParams}`);
+    this.logger.log(`Query Keys: ${Object.keys(queryParams || {}).join(", ")}`);
+    this.logger.log("=== End TrueMoney Webhook (GET) ===");
+
+    // Return empty response with status 200
+    return;
   }
 }
