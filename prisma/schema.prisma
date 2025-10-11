@@ -165,6 +165,9 @@ model BoToken {
   withdraw     Boolean  @default(false)
   deposit      Boolean  @default(false)
   paymentSys   String?  @map("payment_sys") @db.VarChar(20)
+  casUser      String?  @map("cas_user") @db.VarChar(100)
+  casPassword  String?  @map("cas_pwd") @db.VarChar(255)
+  trueSecret   String?  @map("true_secret") @db.VarChar(255)
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
   
