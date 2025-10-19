@@ -136,10 +136,9 @@ export class PaymentChannelsService {
           );
         }
 
+        // ถ้าไม่ส่ง payment_sys มา ให้ default เป็น "bibpay"
         if (!dto.payment_sys) {
-          throw new BadRequestException(
-            "payment_sys is required for payment_gateway type"
-          );
+          dto.payment_sys = "bibpay";
         }
         if (
           !this.paymentGatewayFactory
@@ -171,9 +170,16 @@ export class PaymentChannelsService {
       // สร้าง payment channel ใหม่
       console.log("Creating payment channel with data:", {
         type: dto.type,
-        bankCode: dto.type === "payment_gateway" ? null : dto.bankCode,
-        bankNo: dto.type === "payment_gateway" ? null : dto.bankNo,
-        bankName: dto.type === "payment_gateway" ? null : dto.bankName,
+        bankCode:
+          dto.type === "payment_gateway"
+            ? (dto.bankCode ?? null)
+            : dto.bankCode,
+        bankNo:
+          dto.type === "payment_gateway" ? (dto.bankNo ?? null) : dto.bankNo,
+        bankName:
+          dto.type === "payment_gateway"
+            ? (dto.bankName ?? null)
+            : dto.bankName,
         paymentSys: dto.type === "payment_gateway" ? dto.payment_sys : null,
         enable: dto.enable,
         autoDeposit: dto.autoDeposit,
@@ -184,9 +190,16 @@ export class PaymentChannelsService {
       const newChannel = await this.prisma.paymentChannel.create({
         data: {
           type: dto.type,
-          bankCode: dto.type === "payment_gateway" ? null : dto.bankCode,
-          bankNo: dto.type === "payment_gateway" ? null : dto.bankNo,
-          bankName: dto.type === "payment_gateway" ? null : dto.bankName,
+          bankCode:
+            dto.type === "payment_gateway"
+              ? (dto.bankCode ?? null)
+              : dto.bankCode,
+          bankNo:
+            dto.type === "payment_gateway" ? (dto.bankNo ?? null) : dto.bankNo,
+          bankName:
+            dto.type === "payment_gateway"
+              ? (dto.bankName ?? null)
+              : dto.bankName,
           paymentSys: dto.type === "payment_gateway" ? dto.payment_sys : null,
           enable: dto.enable,
           autoDeposit: dto.autoDeposit,
@@ -253,10 +266,9 @@ export class PaymentChannelsService {
 
       // Validation เหมือน create
       if (dto.type === "payment_gateway") {
+        // ถ้าไม่ส่ง payment_sys มา ให้ default เป็น "bibpay"
         if (!dto.payment_sys) {
-          throw new BadRequestException(
-            "payment_sys is required for payment_gateway type"
-          );
+          dto.payment_sys = "bibpay";
         }
         if (
           !this.paymentGatewayFactory
@@ -268,11 +280,7 @@ export class PaymentChannelsService {
             `Unsupported payment system: ${dto.payment_sys}`
           );
         }
-        if (dto.bankCode || dto.bankNo || dto.bankName) {
-          throw new BadRequestException(
-            "Bank information should be null for payment_gateway type"
-          );
-        }
+        // อนุญาตให้มี bankCode/bankNo/bankName ได้ (ไม่บังคับ)
       } else {
         if (!dto.bankCode || !dto.bankNo || !dto.bankName) {
           throw new BadRequestException(
@@ -291,9 +299,16 @@ export class PaymentChannelsService {
         where: { id: dto.id },
         data: {
           type: dto.type,
-          bankCode: dto.type === "payment_gateway" ? null : dto.bankCode,
-          bankNo: dto.type === "payment_gateway" ? null : dto.bankNo,
-          bankName: dto.type === "payment_gateway" ? null : dto.bankName,
+          bankCode:
+            dto.type === "payment_gateway"
+              ? (dto.bankCode ?? null)
+              : dto.bankCode,
+          bankNo:
+            dto.type === "payment_gateway" ? (dto.bankNo ?? null) : dto.bankNo,
+          bankName:
+            dto.type === "payment_gateway"
+              ? (dto.bankName ?? null)
+              : dto.bankName,
           paymentSys: dto.type === "payment_gateway" ? dto.payment_sys : null,
           enable: dto.enable,
           autoDeposit: dto.autoDeposit,

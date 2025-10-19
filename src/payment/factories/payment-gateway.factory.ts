@@ -27,6 +27,6 @@ export class PaymentGatewayFactory {
   }
 
   getAllPaymentSystems(): string[] {
-    return ["BIB-pay", "PayOneX"]; // ทั้งหมดที่จะรองรับ (รวม PayOneX ที่ยังไม่ได้ทำ)
+    return ["bibpay", "payonex"]; // ทั้งหมดที่จะรองรับ (รวม PayOneX ที่ยังไม่ได้ทำ)
   }
 }

@@ -72,9 +72,9 @@ export class PaymentChannelDataDto {
   autoWithdraw: boolean;
 
   @ApiProperty({
-    example: "bib-pay",
+    example: "bibpay",
     description: "Payment system (only for payment_gateway type)",
-    enum: ["bib-pay", "payonex"],
+    enum: ["bibpay", "payonex"],
     required: false,
   })
   payment_sys?: string; // สำหรับ type "payment_gateway" เท่านั้น
@@ -259,14 +259,14 @@ export class CreatePaymentChannelDto {
   autoWithdraw: boolean;
 
   @ApiProperty({
-    example: "bib-pay",
+    example: "bibpay",
     description: "Payment system (required for payment_gateway type only)",
-    enum: ["bib-pay", "payonex"],
+    enum: ["bibpay", "payonex"],
     required: false,
   })
   @IsOptional()
   @IsString()
-  @IsIn(["bib-pay", "payonex"])
+  @IsIn(["bibpay", "payonex"])
   payment_sys?: string; // สำหรับ type "payment_gateway" เท่านั้น
 }
 
@@ -347,12 +347,12 @@ export class UpdatePaymentChannelDto {
   @ApiProperty({
     example: "payonex",
     description: "Payment system (required for payment_gateway type only)",
-    enum: ["bib-pay", "payonex"],
+    enum: ["bibpay", "payonex"],
     required: false,
   })
   @IsOptional()
   @IsString()
-  @IsIn(["bib-pay", "payonex"])
+  @IsIn(["bibpay", "payonex"])
   payment_sys?: string; // สำหรับ type "payment_gateway" เท่านั้น
 }
 

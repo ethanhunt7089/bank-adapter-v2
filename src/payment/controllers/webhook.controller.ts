@@ -10,9 +10,13 @@ import {
   Req, // เพิ่ม Req decorator
 } from "@nestjs/common";
 import { ApiExcludeController } from "@nestjs/swagger";
-import { getCasApiUrl, handleCasCallback, loginToCas } from "../../lib/cas-api-utils";
+import {
+  getCasApiUrl,
+  handleCasCallback,
+  loginToCas,
+} from "../../lib/cas-api-utils";
 import { prisma } from "../../lib/prisma";
-import { verifyTrueMoneyToken } from '../../lib/true-money-utils';
+import { verifyTrueMoneyToken } from "../../lib/true-money-utils";
 import { logTrueMoneyWebhook } from "../../lib/winston-logger.config";
 import { PaymentService } from "../services/payment.service";
 
@@ -199,182 +203,199 @@ export class WebhookController {
     this.logger.log(`Timestamp: ${new Date().toISOString()}`);
     this.logger.log(`Method: POST`);
     this.logger.log(`Raw Data: ${JSON.stringify(webhookData, null, 2)}`);
-    
+
     // Log to file
     logTrueMoneyWebhook({
-      event: 'WEBHOOK_RECEIVED',
-      method: 'POST',
+      event: "WEBHOOK_RECEIVED",
+      method: "POST",
       rawData: webhookData,
       timestamp: new Date().toISOString(),
     });
 
     try {
       // ดึงข้อมูล host และ domain
-      const protocol = req.protocol;  // 'http' หรือ 'https'
-      const hostname = req.hostname;  // 'bank.chok369.xyz'
-      
+      const protocol = req.protocol; // 'http' หรือ 'https'
+      const hostname = req.hostname; // 'bank.chok369.xyz'
+
       // แยกเอา domain หลัก (chok369.xyz)
-      const domainParts = hostname.split('.');
-      const mainDomain = domainParts.slice(-2).join('.');  // 'chok369.xyz'
-      
+      const domainParts = hostname.split(".");
+      const mainDomain = domainParts.slice(-2).join("."); // 'chok369.xyz'
+
       // สร้าง target_domain แบบเต็ม (https://chok369.xyz)
       const targetDomain = `https://${mainDomain}`;
-      
+
       this.logger.log(`Target Domain: ${targetDomain}`);
       this.logger.log(`Prisma object: ${typeof prisma}`);
       this.logger.log(`Prisma is undefined: ${prisma === undefined}`);
-      this.logger.log(`Prisma keys: ${prisma ? Object.keys(prisma).slice(0, 5).join(', ') : 'N/A'}`);
-      
+      this.logger.log(
+        `Prisma keys: ${prisma ? Object.keys(prisma).slice(0, 5).join(", ") : "N/A"}`
+      );
+
       // ดึงข้อมูลจาก bo_token
       const boToken = await prisma.boToken.findFirst({
         where: {
           targetDomain: targetDomain,
-          isActive: true
-        }
+          isActive: true,
+        },
       });
-      
-      this.logger.log(`Query result: ${boToken ? 'Found' : 'Not found'}`);
+
+      this.logger.log(`Query result: ${boToken ? "Found" : "Not found"}`);
       if (boToken) {
         this.logger.log(`BoToken ID: ${boToken.id}`);
         this.logger.log(`BoToken Target Domain: ${boToken.targetDomain}`);
         this.logger.log(`BoToken casUser: ${boToken.casUser}`);
-        this.logger.log(`BoToken casPassword: ${boToken.casPassword ? 'exists' : 'null'}`);
-        this.logger.log(`BoToken trueSecret: ${boToken.trueSecret ? 'exists' : 'null'}`);
+        this.logger.log(
+          `BoToken casPassword: ${boToken.casPassword ? "exists" : "null"}`
+        );
+        this.logger.log(
+          `BoToken trueSecret: ${boToken.trueSecret ? "exists" : "null"}`
+        );
       }
-      
+
       if (!boToken) {
         this.logger.error(`❌ BoToken not found for domain: ${targetDomain}`);
         logTrueMoneyWebhook({
-          event: 'DB_QUERY_FAILED',
-          error: 'BoToken not found',
+          event: "DB_QUERY_FAILED",
+          error: "BoToken not found",
           domain: targetDomain,
         });
-        return { success: false, message: 'Domain not found' };
+        return { success: false, message: "Domain not found" };
       }
-      
+
       const casUser = boToken.casUser;
       const casPassword = boToken.casPassword;
       const trueSecret = boToken.trueSecret;
-      
+
       this.logger.log(`✅ Found BoToken for domain: ${targetDomain}`);
       this.logger.log(`CAS User: ${casUser}`);
-      this.logger.log(`True Secret: ${trueSecret ? '***' : 'not set'}`);
-      
+      this.logger.log(`True Secret: ${trueSecret ? "***" : "not set"}`);
+
       logTrueMoneyWebhook({
-        event: 'DB_QUERY_SUCCESS',
+        event: "DB_QUERY_SUCCESS",
         domain: targetDomain,
         casUser: casUser,
         hasSecret: !!trueSecret,
       });
-      
+
       // ทดสอบ CAS Login ก่อน
       try {
-        this.logger.log('🔐 Attempting CAS login...');
-        
+        this.logger.log("🔐 Attempting CAS login...");
+
         const casApiUrl = getCasApiUrl(targetDomain);
         this.logger.log(`CAS API URL: ${casApiUrl}`);
-        
+
         const loginResponse = await loginToCas({
           casUser: casUser,
           casPassword: casPassword,
-          targetDomain: targetDomain
+          targetDomain: targetDomain,
         });
-        
-        this.logger.log('✅ CAS login successful');
-        this.logger.log(`Access token: ${loginResponse.access_token.substring(0, 20)}...`);
-        
+
+        this.logger.log("✅ CAS login successful");
+        this.logger.log(
+          `Access token: ${loginResponse.access_token.substring(0, 20)}...`
+        );
+
         logTrueMoneyWebhook({
-          event: 'CAS_LOGIN_SUCCESS',
+          event: "CAS_LOGIN_SUCCESS",
           domain: targetDomain,
           casUser: casUser,
         });
-        
       } catch (casError) {
         this.logger.error(`❌ CAS login failed: ${casError.message}`);
         logTrueMoneyWebhook({
-          event: 'CAS_LOGIN_FAILED',
+          event: "CAS_LOGIN_FAILED",
           error: casError.message,
           domain: targetDomain,
           casUser: casUser,
         });
-        return { success: false, message: `CAS login failed: ${casError.message}` };
+        return {
+          success: false,
+          message: `CAS login failed: ${casError.message}`,
+        };
       }
-      
+
       // ดึง JWT token จาก body
       let token = webhookData?.message || webhookData?.token;
-      
-      if (!token && typeof webhookData === 'string') {
+
+      if (!token && typeof webhookData === "string") {
         token = webhookData;
       }
-      
-      this.logger.log(`📝 Token from webhook (FULL): ${token || 'null'}`);
-      
+
+      this.logger.log(`📝 Token from webhook (FULL): ${token || "null"}`);
+
       logTrueMoneyWebhook({
-        event: 'TOKEN_EXTRACTED',
-        token: token || 'null',
+        event: "TOKEN_EXTRACTED",
+        token: token || "null",
         domain: targetDomain,
       });
-      
-      if (!token || typeof token !== 'string') {
-        this.logger.error('❌ No valid token found in webhook data');
+
+      if (!token || typeof token !== "string") {
+        this.logger.error("❌ No valid token found in webhook data");
         logTrueMoneyWebhook({
-          event: 'TOKEN_VALIDATION_FAILED',
-          error: 'No valid token found',
+          event: "TOKEN_VALIDATION_FAILED",
+          error: "No valid token found",
           domain: targetDomain,
         });
-        return { success: false, message: 'No valid token found' };
+        return { success: false, message: "No valid token found" };
       }
-      
+
       // สำหรับการทดสอบเท่านั้น - comment ออกเมื่อ production
       // this.logger.warn('⚠️ No valid token found in webhook data, using test token for development');
       // token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJldmVudF90eXBlIjoiUDJQIiwicmVjZWl2ZWRfdGltZSI6IjIwMjUtMTAtMTFUMDA6MDE6MTkrMDcwMCIsInNlbmRlcl9tb2JpbGUiOiIwODI2NTM2NTg5IiwibWVzc2FnZSI6IiIsImFtb3VudCI6MTAwLCJjaGFubmVsIjoiIiwic2VuZGVyX25hbWUiOiLguJfguKPguIfguIrguLHguKIg4LmA4Lib4LijKioqIiwidHJhbnNhY3Rpb25faWQiOiI1MDA0NjY0OTc2MjYzNiIsImlhdCI6MTc2MDExNTY4MX0.t7-3q14CHeMwr9hmdin9_H6RqIAniibbMwYvIeQ2I2o';
       // this.logger.log(`Using test token: ${token.substring(0, 20)}...`);
-      
+
       // ใช้ trueSecret จาก database เท่านั้น
       if (!trueSecret) {
-        this.logger.error('❌ TrueSecret not found in database');
+        this.logger.error("❌ TrueSecret not found in database");
         logTrueMoneyWebhook({
-          event: 'SECRET_NOT_FOUND',
-          error: 'TrueSecret not configured in database',
+          event: "SECRET_NOT_FOUND",
+          error: "TrueSecret not configured in database",
           domain: targetDomain,
         });
-        return { success: false, message: 'TrueSecret not configured' };
+        return { success: false, message: "TrueSecret not configured" };
       }
-      
+
       const secret = trueSecret;
-      this.logger.log(`Using secret from database: ${secret.substring(0, 10)}...`);
-      
+      this.logger.log(
+        `Using secret from database: ${secret.substring(0, 10)}...`
+      );
+
       // Verify และ decode JWT token
       const decoded = verifyTrueMoneyToken(token, secret);
-      
+
       if (!decoded) {
-        this.logger.error('❌ TrueMoney JWT verification failed');
+        this.logger.error("❌ TrueMoney JWT verification failed");
         logTrueMoneyWebhook({
-          event: 'JWT_VERIFICATION_FAILED',
-          error: 'Invalid JWT signature or format',
+          event: "JWT_VERIFICATION_FAILED",
+          error: "Invalid JWT signature or format",
           domain: targetDomain,
-          token: token.substring(0, 50) + '...',
+          token: token.substring(0, 50) + "...",
         });
-        return { success: false, message: 'Invalid JWT token' };
+        return { success: false, message: "Invalid JWT token" };
       }
-      
-      this.logger.log('✅ TrueMoney JWT verified successfully');
+
+      this.logger.log("✅ TrueMoney JWT verified successfully");
       this.logger.log(`Event Type: ${decoded.event_type}`);
       this.logger.log(`Transaction ID: ${decoded.transaction_id}`);
       this.logger.log(`Amount: ${decoded.amount}`);
-      this.logger.log(`Sender: ${decoded.sender_name} (${decoded.sender_mobile})`);
+      this.logger.log(
+        `Sender: ${decoded.sender_name} (${decoded.sender_mobile})`
+      );
       this.logger.log(`Received Time: ${decoded.received_time}`);
-      
+
       // สร้างข้อมูล callback สำหรับ CAS ตามรูปแบบที่ถูกต้อง
-      const senderMobile = decoded.sender_mobile || '-';
-      const senderName = decoded.sender_name || 'Unknown';
-      const senderNameSearch = (decoded.sender_name || 'Unknown').replace(/\*/g, ''); // ลบ * สำหรับ search
-      
+      const senderMobile = decoded.sender_mobile || "-";
+      const senderName = decoded.sender_name || "Unknown";
+      const senderNameSearch = (decoded.sender_name || "Unknown").replace(
+        /\*/g,
+        ""
+      ); // ลบ * สำหรับ search
+
       // แปลงจากสตางค์เป็นบาท (หาร 100) และเก็บทศนิยม 2 ตำแหน่ง
       const amountInBaht = parseFloat((decoded.amount / 100).toFixed(2));
-      
+
       logTrueMoneyWebhook({
-        event: 'JWT_DECODED_SUCCESS',
+        event: "JWT_DECODED_SUCCESS",
         domain: targetDomain,
         decoded: {
           event_type: decoded.event_type,
@@ -386,7 +407,7 @@ export class WebhookController {
           received_time: decoded.received_time,
         },
       });
-      
+
       const casCallbackData = {
         timestamp: new Date().toISOString(),
         message: `from true wallet #${decoded.transaction_id}`,
@@ -397,54 +418,60 @@ export class WebhookController {
           bank_account_name: senderName,
           bank_account_name_search: `${senderNameSearch}%`,
           bank_account_number: senderMobile,
-          bank_account_number_search: `${senderMobile}%`
-        }
+          bank_account_number_search: `${senderMobile}%`,
+        },
       };
-      
+
       // ส่ง callback ไปยัง CAS
       try {
         const casApiUrl = getCasApiUrl(targetDomain);
         const callbackUrl = `${casApiUrl}/deposit/v2/central-notification`; // ตามที่คุณบอก
-        
+
         this.logger.log(`Sending callback to CAS: ${callbackUrl}`);
-        
+
         logTrueMoneyWebhook({
-          event: 'SENDING_CAS_CALLBACK',
+          event: "SENDING_CAS_CALLBACK",
           domain: targetDomain,
           callbackUrl: callbackUrl,
           callbackData: casCallbackData,
         });
-        
-        await handleCasCallback({
-          casUser: casUser,
-          casPassword: casPassword,
-          targetDomain: targetDomain
-        }, callbackUrl, casCallbackData);
-        
-        this.logger.log('✅ Callback sent to CAS successfully');
-        
+
+        await handleCasCallback(
+          {
+            casUser: casUser,
+            casPassword: casPassword,
+            targetDomain: targetDomain,
+          },
+          callbackUrl,
+          casCallbackData
+        );
+
+        this.logger.log("✅ Callback sent to CAS successfully");
+
         logTrueMoneyWebhook({
-          event: 'CAS_CALLBACK_SUCCESS',
+          event: "CAS_CALLBACK_SUCCESS",
           domain: targetDomain,
           transaction_id: decoded.transaction_id,
           amount_baht: amountInBaht,
         });
-        
       } catch (casError) {
-        this.logger.error(`❌ Failed to send callback to CAS: ${casError.message}`);
+        this.logger.error(
+          `❌ Failed to send callback to CAS: ${casError.message}`
+        );
         logTrueMoneyWebhook({
-          event: 'CAS_CALLBACK_FAILED',
+          event: "CAS_CALLBACK_FAILED",
           error: casError.message,
           domain: targetDomain,
           transaction_id: decoded.transaction_id,
         });
         // ไม่ return error เพราะ webhook ยังประมวลผลสำเร็จ
       }
-      
     } catch (error) {
-      this.logger.error(`❌ Error processing TrueMoney webhook: ${error.message}`);
+      this.logger.error(
+        `❌ Error processing TrueMoney webhook: ${error.message}`
+      );
       logTrueMoneyWebhook({
-        event: 'WEBHOOK_PROCESSING_ERROR',
+        event: "WEBHOOK_PROCESSING_ERROR",
         error: error.message,
         stack: error.stack,
       });
@@ -453,48 +480,31 @@ export class WebhookController {
 
     this.logger.log("=== End TrueMoney Webhook (POST) ===");
     logTrueMoneyWebhook({
-      event: 'WEBHOOK_COMPLETED',
-      status: 'success',
+      event: "WEBHOOK_COMPLETED",
+      status: "success",
     });
     return { success: true };
   }
 
-  // TrueMoney Webhook - GET Method (Dynamic URL)
-  @Get("true-money/:parameter/webhook")
+  // TrueMoney Webhook - GET Method (รูปแบบเก่า - แบบตายตัว)
+  @Get("true-money/webhook")
   @HttpCode(200)
-  async handleTrueMoneyWebhookGet(
-    @Param('parameter') parameter: string,
-    @Query() queryParams: any,
-    @Req() req: any
-  ) {
+  async handleTrueMoneyWebhookGet(@Query() queryParams: any, @Req() req: any) {
     this.logger.log("=== TrueMoney Webhook (GET) Received ===");
     this.logger.log(`Timestamp: ${new Date().toISOString()}`);
     this.logger.log(`Method: GET`);
-    this.logger.log(`URL Parameter: ${parameter}`);
-    this.logger.log(`Query Params: ${JSON.stringify(queryParams, null, 2)}`);
-    
+
     try {
       // ดึง JWT token จาก query params
       const token = queryParams.message || queryParams.token;
-      
+
       if (token) {
-        // ใช้ parameter เป็น domain เช่น chok369
-        const targetDomain = `https://${parameter}.xyz`;
-        this.logger.log(`Target Domain from parameter: ${targetDomain}`);
-        
-        // ดึงข้อมูลจาก database
-        const boToken = await prisma.boToken.findFirst({
-          where: {
-            targetDomain: targetDomain,
-            isActive: true
-          }
-        });
-        
-        const secret = boToken?.trueSecret || process.env.TRUEMONEY_SECRET || '5ac3229a71af61ea62c5de9bb254c02a';
+        const secret =
+          process.env.TRUEMONEY_SECRET || "5ac3229a71af61ea62c5de9bb254c02a";
         const decoded = verifyTrueMoneyToken(token, secret);
-        
+
         if (decoded) {
-          this.logger.log('✅ TrueMoney JWT verified');
+          this.logger.log("✅ TrueMoney JWT verified");
           this.logger.log(`Transaction ID: ${decoded.transaction_id}`);
           this.logger.log(`Amount: ${decoded.amount}`);
         }
@@ -502,8 +512,76 @@ export class WebhookController {
     } catch (error) {
       this.logger.error(`Error: ${error.message}`);
     }
-    
+
     this.logger.log("=== End TrueMoney Webhook (GET) ===");
+    return;
+  }
+
+  // TrueMoney Webhook - POST Method (Dynamic URL)
+  @Post("true-money/:parameter")
+  @HttpCode(200)
+  async handleTrueMoneyWebhookPostDynamic(
+    @Param("parameter") parameter: string,
+    @Body() webhookData: any
+  ) {
+    this.logger.log("=== TrueMoney Webhook (POST Dynamic) Received ===");
+    this.logger.log(`Timestamp: ${new Date().toISOString()}`);
+    this.logger.log(`Method: POST`);
+    this.logger.log(`URL Parameter: ${parameter}`);
+    this.logger.log(`Body Data: ${JSON.stringify(webhookData, null, 2)}`);
+
+    // แค่ส่ง status 200 กลับไป
+    return { success: true };
+  }
+
+  // TrueMoney Webhook - GET Method (Dynamic URL)
+  @Get("true-money/:parameter")
+  @HttpCode(200)
+  async handleTrueMoneyWebhookGetDynamic(
+    @Param("parameter") parameter: string,
+    @Query() queryParams: any,
+    @Req() req: any
+  ) {
+    this.logger.log("=== TrueMoney Webhook (GET Dynamic) Received ===");
+    this.logger.log(`Timestamp: ${new Date().toISOString()}`);
+    this.logger.log(`Method: GET`);
+    this.logger.log(`URL Parameter: ${parameter}`);
+    this.logger.log(`Query Params: ${JSON.stringify(queryParams, null, 2)}`);
+
+    try {
+      // ดึง JWT token จาก query params
+      const token = queryParams.message || queryParams.token;
+
+      if (token) {
+        // ใช้ parameter เป็น domain เช่น chok369
+        const targetDomain = `https://${parameter}.xyz`;
+        this.logger.log(`Target Domain from parameter: ${targetDomain}`);
+
+        // ดึงข้อมูลจาก database
+        const boToken = await prisma.boToken.findFirst({
+          where: {
+            targetDomain: targetDomain,
+            isActive: true,
+          },
+        });
+
+        const secret =
+          boToken?.trueSecret ||
+          process.env.TRUEMONEY_SECRET ||
+          "5ac3229a71af61ea62c5de9bb254c02a";
+        const decoded = verifyTrueMoneyToken(token, secret);
+
+        if (decoded) {
+          this.logger.log("✅ TrueMoney JWT verified");
+          this.logger.log(`Transaction ID: ${decoded.transaction_id}`);
+          this.logger.log(`Amount: ${decoded.amount}`);
+        }
+      }
+    } catch (error) {
+      this.logger.error(`Error: ${error.message}`);
+    }
+
+    this.logger.log("=== End TrueMoney Webhook (GET Dynamic) ===");
     return;
   }
 }
