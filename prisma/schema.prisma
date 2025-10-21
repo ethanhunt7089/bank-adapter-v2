@@ -167,7 +167,9 @@ model BoToken {
   paymentSys   String?  @map("payment_sys") @db.VarChar(20)
   casUser      String?  @map("cas_user") @db.VarChar(100)
   casPassword  String?  @map("cas_pwd") @db.VarChar(255)
+  casApiBase   String?  @map("cas_api_base") @db.VarChar(500)
   trueSecret   String?  @map("true_secret") @db.VarChar(255)
+  targetAccNum String?  @map("target_acc_num") @db.VarChar(15)
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
   
