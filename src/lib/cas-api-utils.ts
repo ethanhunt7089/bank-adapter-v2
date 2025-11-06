@@ -1,4 +1,5 @@
 import axios from "axios";
+import { logTrueMoneyWebhook } from "./winston-logger.config";
 
 export interface CasLoginRequest {
   username: string;
@@ -76,7 +77,7 @@ export async function loginToCas(
         "Content-Type": "application/json",
         "User-Agent": "Bank-Adapter-v2/1.0",
       },
-      timeout: 10000, // 10 seconds timeout
+      timeout: 30000, // 10 seconds timeout
     });
 
     if (response.status !== 200 && response.status !== 201) {
@@ -136,22 +137,56 @@ export async function sendCallbackToCas(
           Authorization: `Bearer ${accessToken}`,
           "User-Agent": "Bank-Adapter-v2/1.0",
         },
-        timeout: 5000, // 5 seconds timeout
+        timeout: 30000, // 30 seconds timeout
       })
       .then((response) => {
         console.log(
           `✅ Callback sent successfully to CAS, Status: ${response.status}`
         );
+
+        // Log response จาก CAS เข้า log file
+        logTrueMoneyWebhook({
+          event: "CAS_CALLBACK_RESPONSE",
+          status: response.status,
+          statusText: response.statusText,
+          responseData: response.data,
+          responseHeaders: response.headers,
+          callbackUrl: callbackUrl,
+        });
       })
       .catch((error) => {
         console.error(`❌ Failed to send callback to CAS:`, error.message);
+
+        // Log error response จาก CAS เข้า log file
         if (axios.isAxiosError(error)) {
           if (error.response) {
             console.error(
               `Server error: ${error.response.status} - ${error.response.statusText}`
             );
             console.error(`Response data:`, error.response.data);
+
+            logTrueMoneyWebhook({
+              event: "CAS_CALLBACK_ERROR_RESPONSE",
+              error: error.message,
+              status: error.response.status,
+              statusText: error.response.statusText,
+              responseData: error.response.data,
+              responseHeaders: error.response.headers,
+              callbackUrl: callbackUrl,
+            });
+          } else {
+            logTrueMoneyWebhook({
+              event: "CAS_CALLBACK_ERROR",
+              error: error.message,
+              callbackUrl: callbackUrl,
+            });
           }
+        } else {
+          logTrueMoneyWebhook({
+            event: "CAS_CALLBACK_ERROR",
+            error: error.message,
+            callbackUrl: callbackUrl,
+          });
         }
       });
 
@@ -215,7 +250,7 @@ export async function validateTargetAccountWithBanks(
         Authorization: `Bearer ${accessToken}`,
         "User-Agent": "Bank-Adapter-v2/1.0",
       },
-      timeout: 10000, // 10 seconds timeout
+      timeout: 30000, // 10 seconds timeout
     });
 
     if (response.status !== 200) {
