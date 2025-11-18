@@ -324,12 +324,59 @@ export class WebhookController {
           });
         } catch (casError) {
           this.logger.error(`❌ CAS login failed: ${casError.message}`);
-          logTrueMoneyWebhook({
+
+          // Log ละเอียดเพิ่มเติม
+          const errorDetails: any = {
             event: "CAS_LOGIN_FAILED",
             error: casError.message,
-            domain: targetDomain,
+            casApiBase: casApiBase,
             casUser: casUser,
-          });
+          };
+
+          // ดึงข้อมูล error จาก CAS ที่เก็บไว้ใน error object
+          if (
+            casError &&
+            typeof casError === "object" &&
+            "casError" in casError
+          ) {
+            const casErrorData = (casError as any).casError;
+            if (casErrorData.status) {
+              // Error จาก CAS response
+              errorDetails.status = casErrorData.status;
+              errorDetails.statusText = casErrorData.statusText;
+              errorDetails.responseData = casErrorData.responseData;
+            } else if (casErrorData.errorCode) {
+              // Error จาก CAS request (unreachable)
+              errorDetails.errorCode = casErrorData.errorCode;
+              errorDetails.isTimeout = casErrorData.isTimeout;
+              errorDetails.loginUrl = `${casApiBase}/admin/login`;
+              errorDetails.errorType = "CONNECTION_ERROR";
+            }
+          }
+
+          // เพิ่มข้อมูล error ถ้าเป็น Axios error (fallback)
+          if (axios.isAxiosError(casError)) {
+            if (casError.response) {
+              errorDetails.status = casError.response.status;
+              errorDetails.statusText = casError.response.statusText;
+              errorDetails.responseData = casError.response.data;
+            } else if (casError.request) {
+              errorDetails.errorCode = casError.code;
+              errorDetails.isTimeout = casError.code === "ECONNABORTED";
+            }
+          }
+
+          // เพิ่มข้อมูลเพิ่มเติมถ้า error message บอกว่า unreachable
+          if (
+            casError.message &&
+            casError.message.includes("unreachable") &&
+            !errorDetails.loginUrl
+          ) {
+            errorDetails.loginUrl = `${casApiBase}/admin/login`;
+            errorDetails.errorType = "CONNECTION_ERROR";
+          }
+
+          logTrueMoneyWebhook(errorDetails);
           // ส่ง response data แต่ยังคง status 200
           return {
             success: false,
