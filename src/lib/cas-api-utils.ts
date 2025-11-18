@@ -59,11 +59,11 @@ export function getCasApiUrl(targetDomain: string): string {
 export async function loginToCas(
   config: CasApiConfig
 ): Promise<CasLoginResponse> {
-  try {
-    // ใช้ casApiBase ถ้ามี ถ้าไม่มีจึงใช้ targetDomain
-    const casApiUrl = config.casApiBase || getCasApiUrl(config.targetDomain);
-    const loginUrl = `${casApiUrl}/admin/login`;
+  // ใช้ casApiBase ถ้ามี ถ้าไม่มีจึงใช้ targetDomain
+  const casApiUrl = config.casApiBase || getCasApiUrl(config.targetDomain);
+  const loginUrl = `${casApiUrl}/admin/login`;
 
+  try {
     const loginData: CasLoginRequest = {
       username: config.casUser,
       password: config.casPassword,
@@ -100,15 +100,81 @@ export async function loginToCas(
           `Server error: ${error.response.status} - ${error.response.statusText}`
         );
         console.error(`Response data:`, error.response.data);
-        throw new Error(
+
+        // Log ละเอียด
+        logTrueMoneyWebhook({
+          event: "CAS_LOGIN_ERROR_RESPONSE",
+          error: error.message,
+          status: error.response.status,
+          statusText: error.response.statusText,
+          responseData: error.response.data,
+          responseHeaders: error.response.headers,
+          loginUrl: loginUrl,
+          casUser: config.casUser,
+          casApiBase: config.casApiBase,
+          targetDomain: config.targetDomain,
+        });
+
+        const casError = new Error(
           `CAS API error: ${error.response.status} - ${error.response.data?.message || error.response.statusText}`
         );
+        // เก็บข้อมูล error จาก CAS ไว้ใน error object
+        (casError as any).casError = {
+          status: error.response.status,
+          statusText: error.response.statusText,
+          responseData: error.response.data,
+          responseHeaders: error.response.headers,
+        };
+        throw casError;
       } else if (error.request) {
         // Request was made but no response received
         console.error(`No response received from CAS API`);
-        throw new Error("CAS API unreachable");
+        console.error(`Request URL: ${loginUrl}`);
+        console.error(`Request method: POST`);
+        console.error(
+          `Request timeout: ${error.code === "ECONNABORTED" ? "Yes" : "No"}`
+        );
+        console.error(`Error code: ${error.code || "N/A"}`);
+        console.error(`Error message: ${error.message}`);
+
+        // Log ละเอียด
+        logTrueMoneyWebhook({
+          event: "CAS_LOGIN_UNREACHABLE",
+          error: error.message,
+          errorCode: error.code,
+          loginUrl: loginUrl,
+          casUser: config.casUser,
+          casApiBase: config.casApiBase,
+          targetDomain: config.targetDomain,
+          isTimeout: error.code === "ECONNABORTED",
+          requestConfig: {
+            timeout: 30000,
+            method: "POST",
+            url: loginUrl,
+          },
+        });
+
+        const casError = new Error("CAS API unreachable");
+        // เก็บข้อมูล error จาก CAS ไว้ใน error object
+        (casError as any).casError = {
+          errorCode: error.code,
+          isTimeout: error.code === "ECONNABORTED",
+          requestUrl: loginUrl,
+        };
+        throw casError;
       }
     }
+
+    // Log error อื่นๆ
+    logTrueMoneyWebhook({
+      event: "CAS_LOGIN_ERROR",
+      error: error.message,
+      errorStack: error.stack,
+      loginUrl: loginUrl,
+      casUser: config.casUser,
+      casApiBase: config.casApiBase,
+      targetDomain: config.targetDomain,
+    });
 
     throw error;
   }
@@ -173,12 +239,16 @@ export async function sendCallbackToCas(
               responseData: error.response.data,
               responseHeaders: error.response.headers,
               callbackUrl: callbackUrl,
+              payload: callbackData,
             });
           } else {
             logTrueMoneyWebhook({
               event: "CAS_CALLBACK_ERROR",
               error: error.message,
+              errorCode: error.code,
               callbackUrl: callbackUrl,
+              payload: callbackData,
+              isTimeout: error.code === "ECONNABORTED",
             });
           }
         } else {
@@ -186,6 +256,7 @@ export async function sendCallbackToCas(
             event: "CAS_CALLBACK_ERROR",
             error: error.message,
             callbackUrl: callbackUrl,
+            payload: callbackData,
           });
         }
       });
@@ -219,6 +290,61 @@ export async function handleCasCallback(
     console.log(`✅ CAS callback completed successfully`);
   } catch (error) {
     console.error(`❌ CAS callback failed:`, error.message);
+
+    // Log ละเอียดเมื่อเกิด error
+    if (axios.isAxiosError(error)) {
+      if (error.response) {
+        logTrueMoneyWebhook({
+          event: "CAS_CALLBACK_HANDLER_ERROR_RESPONSE",
+          error: error.message,
+          status: error.response.status,
+          statusText: error.response.statusText,
+          responseData: error.response.data,
+          responseHeaders: error.response.headers,
+          callbackUrl: callbackUrl,
+          casUser: config.casUser,
+          casApiBase: config.casApiBase,
+          targetDomain: config.targetDomain,
+        });
+      } else if (error.request) {
+        logTrueMoneyWebhook({
+          event: "CAS_CALLBACK_HANDLER_UNREACHABLE",
+          error: error.message,
+          errorCode: error.code,
+          callbackUrl: callbackUrl,
+          casUser: config.casUser,
+          casApiBase: config.casApiBase,
+          targetDomain: config.targetDomain,
+          isTimeout: error.code === "ECONNABORTED",
+          requestConfig: {
+            timeout: 30000,
+            method: "POST",
+            url: callbackUrl,
+          },
+        });
+      } else {
+        logTrueMoneyWebhook({
+          event: "CAS_CALLBACK_HANDLER_ERROR",
+          error: error.message,
+          errorStack: error.stack,
+          callbackUrl: callbackUrl,
+          casUser: config.casUser,
+          casApiBase: config.casApiBase,
+          targetDomain: config.targetDomain,
+        });
+      }
+    } else {
+      logTrueMoneyWebhook({
+        event: "CAS_CALLBACK_HANDLER_ERROR",
+        error: error.message,
+        errorStack: error.stack,
+        callbackUrl: callbackUrl,
+        casUser: config.casUser,
+        casApiBase: config.casApiBase,
+        targetDomain: config.targetDomain,
+      });
+    }
+
     throw error;
   }
 }

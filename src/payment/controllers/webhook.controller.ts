@@ -10,6 +10,7 @@ import {
   Req, // เพิ่ม Req decorator
 } from "@nestjs/common";
 import { ApiExcludeController } from "@nestjs/swagger";
+import axios from "axios";
 import {
   handleCasCallback,
   loginToCas,
@@ -519,11 +520,11 @@ export class WebhookController {
             }
 
             // ส่ง callback ไปยัง CAS
-            try {
-              // ใช้ casApiBase จาก database แทนการสร้าง URL เอง
-              const casApiUrl = casApiBase;
-              const callbackUrl = `${casApiUrl}/deposit/v2/central-notification`;
+            // ใช้ casApiBase จาก database แทนการสร้าง URL เอง
+            const casApiUrl = casApiBase;
+            const callbackUrl = `${casApiUrl}/deposit/v2/central-notification`;
 
+            try {
               this.logger.log(`Sending callback to CAS: ${callbackUrl}`);
 
               logTrueMoneyWebhook({
@@ -556,12 +557,64 @@ export class WebhookController {
               this.logger.error(
                 `❌ Failed to send callback to CAS: ${casError.message}`
               );
-              logTrueMoneyWebhook({
+
+              // Log ละเอียดเพิ่มเติม
+              const errorDetails: any = {
                 event: "CAS_CALLBACK_FAILED",
                 error: casError.message,
-                domain: targetDomain,
                 transaction_id: decoded.transaction_id,
-              });
+                amount_baht: amountInBaht,
+                casApiBase: casApiBase,
+                callbackUrl: callbackUrl,
+                casUser: casUser,
+                payload: casCallbackData,
+              };
+
+              // ดึงข้อมูล error จาก CAS ที่เก็บไว้ใน error object
+              if (
+                casError &&
+                typeof casError === "object" &&
+                "casError" in casError
+              ) {
+                const casErrorData = (casError as any).casError;
+                if (casErrorData.status) {
+                  // Error จาก CAS response
+                  errorDetails.status = casErrorData.status;
+                  errorDetails.statusText = casErrorData.statusText;
+                  errorDetails.responseData = casErrorData.responseData;
+                } else if (casErrorData.errorCode) {
+                  // Error จาก CAS request (unreachable)
+                  errorDetails.errorCode = casErrorData.errorCode;
+                  errorDetails.isTimeout = casErrorData.isTimeout;
+                  errorDetails.loginUrl = `${casApiBase}/admin/login`;
+                  errorDetails.errorType = "CONNECTION_ERROR";
+                }
+              }
+
+              // เพิ่มข้อมูล error ถ้าเป็น Axios error (fallback)
+              if (axios.isAxiosError(casError)) {
+                if (casError.response) {
+                  errorDetails.status = casError.response.status;
+                  errorDetails.statusText = casError.response.statusText;
+                  errorDetails.responseData = casError.response.data;
+                } else if (casError.request) {
+                  errorDetails.errorCode = casError.code;
+                  errorDetails.isTimeout = casError.code === "ECONNABORTED";
+                }
+              }
+
+              // เพิ่มข้อมูลเพิ่มเติมถ้า error message บอกว่า unreachable
+              if (
+                casError.message &&
+                casError.message.includes("unreachable") &&
+                !errorDetails.loginUrl
+              ) {
+                errorDetails.loginUrl = `${casApiBase}/admin/login`;
+                errorDetails.errorType = "CONNECTION_ERROR";
+              }
+
+              logTrueMoneyWebhook(errorDetails);
+
               // ไม่ return error เพราะ webhook ยังประมวลผลสำเร็จ
             }
           }
