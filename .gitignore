@@ -45,3 +45,7 @@ prisma/dev.db-journal
 
 # Docker
 .dockerignore
+
+# Backups
+backup.sql
+*.zip
