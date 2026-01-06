@@ -47,7 +47,7 @@ model TransactionCursor {
   createdAt                DateTime @default(now()) @map("created_at")
   updatedAt                DateTime @updatedAt @map("updated_at")
   from_bank_account_number String
-  token                    Token    @relation(fields: [tokenUuid], references: [uuid], map: "fk_transaction_cursor_token")
+  token                    Token    @relation(fields: [tokenUuid], references: [uuid])
 
   @@unique([tokenUuid, from_bank_account_number], map: "unique_token_account")
   @@map("transaction_cursors")
@@ -159,7 +159,6 @@ model BankInfo {
 
 model BoToken {
   id           Int      @id @default(autoincrement())
-  targetDomain String   @map("target_domain") @db.VarChar(500)
   token        String   @unique @map("token") @db.Uuid
   isActive     Boolean  @default(true) @map("is_active")
   withdraw     Boolean  @default(false)
@@ -167,16 +166,35 @@ model BoToken {
   paymentSys   String?  @map("payment_sys") @db.VarChar(20)
   casUser      String?  @map("cas_user") @db.VarChar(100)
   casPassword  String?  @map("cas_pwd") @db.VarChar(255)
-  casApiBase   String?  @map("cas_api_base") @db.VarChar(500)
-  trueSecret   String?  @map("true_secret") @db.VarChar(255)
-  targetAccNum String?  @map("target_acc_num") @db.VarChar(15)
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
   
+  // Deprecated fields (Moved to BoWebhook) - Keep here to prevent accidental deletion via db push
+  targetDomain String?  @map("target_domain") @db.VarChar(500)
+  trueSecret   String?  @map("true_secret") @db.VarChar(255)
+  targetAccNum String?  @map("target_acc_num") @db.VarChar(15)
+  casApiBase   String?  @map("cas_api_base") @db.VarChar(500)
+  
+  webhooks     BoWebhook[]
   paymentKeys  PaymentKey[]
   users        User[]       // One-to-many relation to User
   
   @@map("bo_token")
+}
+
+model BoWebhook {
+  id           Int      @id @default(autoincrement())
+  boTokenId    Int      @map("bo_token_id")
+  targetDomain String   @unique @map("target_domain") @db.VarChar(500)
+  trueSecret   String?  @map("true_secret") @db.VarChar(255)
+  targetAccNum String?  @map("target_acc_num") @db.VarChar(15)
+  casApiBase   String?  @map("cas_api_base") @db.VarChar(500)
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+  
+  boToken      BoToken  @relation(fields: [boTokenId], references: [id])
+
+  @@map("bo_webhooks")
 }
 
 
@@ -184,9 +202,9 @@ model PaymentKey {
   id            Int      @id @default(autoincrement())
   token         String   @map("token") @db.Uuid
   paymentSys    String   @map("payment_sys") @db.VarChar(20)
-  paymentKey    String?  @map("payment_key") @db.VarChar(100)
-  paymentSecret String?  @map("payment_secret") @db.VarChar(100)
-  paymentAccess String?  @map("payment_access") @db.VarChar(100)
+  paymentKey    String?  @map("payment_key") @db.VarChar(500)
+  paymentSecret String?  @map("payment_secret") @db.VarChar(500)
+  paymentAccess String?  @map("payment_access") @db.VarChar(500)
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
   

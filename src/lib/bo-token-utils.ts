@@ -58,30 +58,27 @@ export async function getTargetDomainByBoToken(
   token: string
 ): Promise<string | null> {
   try {
-    const boToken = await prisma.boToken.findUnique({
+    const boWebhook = await prisma.boWebhook.findFirst({
       where: {
-        token: token,
+        boToken: {
+          token: token,
+          isActive: true,
+        },
       },
       select: {
         targetDomain: true,
-        isActive: true,
       },
     });
 
-    if (!boToken) {
-      console.log(`❌ BoToken not found for token: ${token}`);
-      return null;
-    }
-
-    if (!boToken.isActive) {
-      console.log(`❌ BoToken is inactive for token: ${token}`);
+    if (!boWebhook) {
+      console.log(`❌ BoWebhook not found or BoToken inactive for token: ${token}`);
       return null;
     }
 
     console.log(
-      `✅ Found target domain: ${boToken.targetDomain} for token: ${token}`
+      `✅ Found target domain: ${boWebhook.targetDomain} for token: ${token}`
     );
-    return boToken.targetDomain;
+    return boWebhook.targetDomain;
   } catch (error) {
     console.error(`❌ Error getting target domain for token ${token}:`, error);
     return null;

@@ -244,45 +244,51 @@ export class WebhookController {
       this.logger.log(`Original URL: ${originalUrl}`);
       this.logger.log(`Target Domain: ${targetDomain}`);
 
-      // ดึงข้อมูลจาก bo_token - ลองทั้ง HTTP และ HTTPS
-      let boToken = await prisma.boToken.findFirst({
+      // ดึงข้อมูลจาก bo_webhook - เชื่อมโยงกับ bo_token
+      let boWebhook = await prisma.boWebhook.findFirst({
         where: {
           targetDomain: targetDomain,
-          isActive: true,
+        },
+        include: {
+          boToken: true,
         },
       });
 
-      this.logger.log(`Query result: ${boToken ? "Found" : "Not found"}`);
-      if (boToken) {
-        this.logger.log(`BoToken ID: ${boToken.id}`);
-        this.logger.log(`BoToken Target Domain: ${boToken.targetDomain}`);
-        this.logger.log(`BoToken casUser: ${boToken.casUser}`);
+      this.logger.log(`Query result: ${boWebhook ? "Found" : "Not found"}`);
+      if (boWebhook) {
+        this.logger.log(`BoWebhook ID: ${boWebhook.id}`);
+        this.logger.log(`BoToken ID: ${boWebhook.boToken.id}`);
+        this.logger.log(`BoWebhook Target Domain: ${boWebhook.targetDomain}`);
+        this.logger.log(`BoToken casUser: ${boWebhook.boToken.casUser}`);
         this.logger.log(
-          `BoToken casPassword: ${boToken.casPassword ? "exists" : "null"}`
+          `BoToken casPassword: ${boWebhook.boToken.casPassword ? "exists" : "null"}`
         );
         this.logger.log(
-          `BoToken trueSecret: ${boToken.trueSecret ? "exists" : "null"}`
+          `BoWebhook trueSecret: ${boWebhook.trueSecret ? "exists" : "null"}`
         );
       }
 
-      if (!boToken) {
-        this.logger.error(`❌ ไม่พบข้อมูล webhook สำหรับ: ${targetDomain}`);
+      if (!boWebhook || !boWebhook.boToken.isActive) {
+        this.logger.error(`❌ ไม่พบข้อมูล webhook หรือ บัญชีถูกปิดใช้งาน สำหรับ: ${targetDomain}`);
         logTrueMoneyWebhook({
           event: "DB_QUERY_FAILED",
-          error: "BoToken not found",
+          error: "BoWebhook not found or BoToken inactive",
           domain: targetDomain,
         });
         // ส่ง response data แต่ยังคง status 200
         return {
           success: false,
-          message: "ไม่พบการตั้งค่า TrueMoney Webhook สำหรับ domain นี้",
+          message:
+            "ไม่พบการตั้งค่า TrueMoney Webhook หรือบัญชีถูกปิดใช้งานสำหรับ domain นี้",
           targetDomain: targetDomain,
         };
       } else {
+        const boToken = boWebhook.boToken; // ให้โค้ดเดิมที่ใช้ boToken.xxx ยังทำงานได้
         const casUser = boToken.casUser;
         const casPassword = boToken.casPassword;
-        const trueSecret = boToken.trueSecret;
-        const casApiBase = boToken.casApiBase; // เพิ่ม cas_api_base จาก database
+        const trueSecret = boWebhook.trueSecret; // ดึงจาก webhook (detail)
+        const casApiBase = boWebhook.casApiBase; // ดึงจาก webhook (detail)
+        const targetAccNum = boWebhook.targetAccNum; // ดึงจาก webhook (detail)
 
         this.logger.log(`✅ Found BoToken for domain: ${targetDomain}`);
         this.logger.log(`CAS User: ${casUser}`);
@@ -495,13 +501,13 @@ export class WebhookController {
                 bank_account_name_search: `${senderNameSearch}%`,
                 bank_account_number: senderMobile,
                 bank_account_number_search: `${senderMobile}%`,
-                cas_bank_account_number: boToken.targetAccNum,
-                cas_bank_account_number_search: `${boToken.targetAccNum}%`,
+                cas_bank_account_number: targetAccNum,
+                cas_bank_account_number_search: `${targetAccNum}%`,
               },
             };
 
             // ตรวจสอบ target account กับ CAS banks API ก่อนส่ง callback
-            if (!boToken.targetAccNum) {
+            if (!targetAccNum) {
               this.logger.error(
                 `❌ Target account number not configured for domain: ${targetDomain}`
               );
@@ -519,13 +525,13 @@ export class WebhookController {
             // ตรวจสอบ target account กับ CAS banks API
             try {
               this.logger.log(
-                `🔍 Validating target account ${boToken.targetAccNum} with CAS banks API`
+                `🔍 Validating target account ${targetAccNum} with CAS banks API`
               );
 
               const validation = await validateTargetAccountWithBanks(
-                boToken.casApiBase, // ใช้ casApiBase จาก database
+                casApiBase, // ใช้ casApiBase จาก webhook
                 loginResponse.access_token,
-                boToken.targetAccNum
+                targetAccNum
               );
 
               if (!validation.isValid) {
@@ -535,20 +541,20 @@ export class WebhookController {
                 logTrueMoneyWebhook({
                   event: "TARGET_ACCOUNT_VALIDATION_FAILED",
                   error: validation.message,
-                  target_account: boToken.targetAccNum,
-                  domain: boToken.casApiBase,
+                  target_account: targetAccNum,
+                  domain: casApiBase,
                 });
                 return { success: false, message: validation.message };
               }
 
               this.logger.log(
-                `✅ Target account ${boToken.targetAccNum} validated successfully`
+                `✅ Target account ${targetAccNum} validated successfully`
               );
               logTrueMoneyWebhook({
                 event: "TARGET_ACCOUNT_VALIDATION_SUCCESS",
-                target_account: boToken.targetAccNum,
+                target_account: targetAccNum,
                 bank_info: validation.bankInfo,
-                domain: boToken.casApiBase,
+                domain: casApiBase,
               });
             } catch (validationError) {
               this.logger.error(
@@ -557,8 +563,8 @@ export class WebhookController {
               logTrueMoneyWebhook({
                 event: "TARGET_ACCOUNT_VALIDATION_ERROR",
                 error: validationError.message,
-                target_account: boToken.targetAccNum,
-                domain: boToken.casApiBase,
+                target_account: targetAccNum,
+                domain: casApiBase,
               });
               return {
                 success: false,
@@ -721,15 +727,17 @@ export class WebhookController {
         this.logger.log(`Target Domain from parameter: ${targetDomain}`);
 
         // ดึงข้อมูลจาก database
-        const boToken = await prisma.boToken.findFirst({
+        const boWebhook = await prisma.boWebhook.findFirst({
           where: {
             targetDomain: targetDomain,
-            isActive: true,
           },
+          include: {
+            boToken: true,
+          }
         });
 
         const secret =
-          boToken?.trueSecret ||
+          (boWebhook && boWebhook.boToken.isActive ? boWebhook.trueSecret : null) ||
           process.env.TRUEMONEY_SECRET ||
           "5ac3229a71af61ea62c5de9bb254c02a";
         const decoded = verifyTrueMoneyToken(token, secret);
