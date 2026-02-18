@@ -608,27 +608,46 @@ export async function validateTargetAccountWithBanks(
 
     console.log(`📊 Received ${banks.length} banks from CAS`);
 
+    // --- เพิ่ม LOG เพื่อตรวจสอบบัญชีทั้งหมดที่ได้รับจาก CAS ---
+    const bankSummary = banks.map((b: any, index: number) => ({
+      index: index + 1,
+      acc_no: b.account_no,
+      phone: b.phone_number,
+      is_dep: b.is_enable_deposit,
+      is_show: b.is_show,
+      bank_code: b.bank_code
+    }));
+    console.log(`🔍 Target Account to match: "${targetAccNum}"`);
+    console.log(`🏦 CAS Bank List Detail:`, JSON.stringify(bankSummary, null, 2));
+    // -----------------------------------------------------
+
     // ค้นหาบัญชีที่ตรงกับ targetAccNum (เช็คเบอร์โทรศัพท์ และต้องเปิดรับฝากเงิน)
     // ไม่เช็ค is_show เพราะบางบัญชีอาจเป็นบัญชีส่วนตัวที่ Admin แจ้งลูกค้าโดยตรง
     const foundBank = banks.find((bank: any) => {
-      return (
-        bank.phone_number === targetAccNum &&
-        bank.is_enable_deposit === true
-      );
+      // เช็คทั้ง phone_number และ account_no เพื่อความแม่นยำ
+      const isMatch = (bank.phone_number === targetAccNum || bank.account_no === targetAccNum) &&
+        bank.is_enable_deposit === true;
+      return isMatch;
     });
 
     if (foundBank) {
-      console.log(`✅ Found target account ${targetAccNum} in CAS banks`);
-      console.log(`Bank info:`, JSON.stringify(foundBank, null, 2));
+      console.log(`✅ Found target account ${targetAccNum} in CAS banks (Matched ID: ${foundBank.id})`);
       return {
         isValid: true,
         bankInfo: foundBank,
       };
     } else {
-      console.warn(`❌ Target account ${targetAccNum} not found in CAS banks`);
+      console.warn(`❌ Target account ${targetAccNum} not found in active CAS banks`);
+
+      // วิเคราะห์เบื้องต้นว่าทำไมไม่เจอ
+      const hasNumberButDisabled = banks.find((b: any) => b.phone_number === targetAccNum || b.account_no === targetAccNum);
+      if (hasNumberButDisabled) {
+        console.warn(`💡 Hint: Found account ${targetAccNum} but is_enable_deposit is FALSE`);
+      }
+
       return {
         isValid: false,
-        message: `Target account ${targetAccNum} not found in CAS banks`,
+        message: `Target account ${targetAccNum} not found in active CAS banks`,
       };
     }
   } catch (error) {
