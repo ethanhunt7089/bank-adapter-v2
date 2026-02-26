@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as winston from 'winston';
+import 'winston-daily-rotate-file';
 
 // สร้างโฟลเดอร์ logs ถ้ายังไม่มี
 const logsDir = path.join(process.cwd(), 'logs');
@@ -12,12 +13,12 @@ if (!fs.existsSync(logsDir)) {
 // Custom format สำหรับ log
 const customFormat = winston.format.printf(({ timestamp, level, message, ...meta }) => {
   let logMessage = `[${timestamp}] [${level.toUpperCase()}] ${message}`;
-  
+
   // ถ้ามี metadata เพิ่มเติม
   if (Object.keys(meta).length > 0) {
     logMessage += `\n${JSON.stringify(meta, null, 2)}`;
   }
-  
+
   return logMessage;
 });
 
@@ -39,27 +40,39 @@ export const webhookLogger = winston.createLogger({
         customFormat
       )
     }),
-    
-    // File output - All logs
-    new winston.transports.File({
-      filename: path.join(logsDir, 'webhook-combined.log'),
-      maxsize: 10485760, // 10MB
-      maxFiles: 5,
+
+    // File output - All logs (Daily Rotate + Size Limit)
+    // ชื่อไฟล์: webhook-combined-YYYY-MM-DD.log
+    // ถ้าไฟล์ขนาดเกิน 10MB จะแยกเป็น _1, _2 ฯลฯ
+    new winston.transports.DailyRotateFile({
+      filename: path.join(logsDir, 'webhook-combined-%DATE%.log'),
+      datePattern: 'YYYY-MM-DD',
+      maxSize: '10m',           // แยกไฟล์ทุก 10MB → _1, _2, ...
+      maxFiles: '14d',          // เก็บย้อนหลัง 14 วัน
+      zippedArchive: false,
     }),
-    
-    // File output - Error logs only
-    new winston.transports.File({
-      filename: path.join(logsDir, 'webhook-error.log'),
+
+    // File output - Error logs only (Daily Rotate)
+    // ชื่อไฟล์: webhook-error-YYYY-MM-DD.log
+    new winston.transports.DailyRotateFile({
+      filename: path.join(logsDir, 'webhook-error-%DATE%.log'),
+      datePattern: 'YYYY-MM-DD',
       level: 'error',
-      maxsize: 10485760, // 10MB
-      maxFiles: 5,
+      maxSize: '10m',
+      maxFiles: '30d',          // เก็บ error ย้อนหลัง 30 วัน
+      zippedArchive: false,
     }),
-    
-    // File output - TrueMoney specific
-    new winston.transports.File({
-      filename: path.join(logsDir, 'truemoney-webhook.log'),
-      maxsize: 10485760, // 10MB
-      maxFiles: 10,
+
+    // File output - TrueMoney specific (Daily Rotate)
+    // ชื่อไฟล์: truemoney-webhook-YYYY-MM-DD.log
+    // ถ้าวันนี้มีเกิน 1 ไฟล์ → truemoney-webhook-2026-02-26.log, truemoney-webhook-2026-02-26_1.log, ...
+    new winston.transports.DailyRotateFile({
+      filename: path.join(logsDir, 'truemoney-webhook-%DATE%.log'),
+      datePattern: 'YYYY-MM-DD',
+      maxSize: '10m',
+      maxFiles: '14d',
+      zippedArchive: false,
+      auditFile: path.join(logsDir, '.truemoney-audit.json'), // ติดตาม index ไฟล์
     }),
   ],
 });
@@ -81,7 +94,7 @@ export function logTrueMoneyWebhook(data: {
     event: data.event,
     ...data,
   };
-  
+
   if (data.error) {
     webhookLogger.error(`TrueMoney Webhook - ${data.event}`, logEntry);
   } else {

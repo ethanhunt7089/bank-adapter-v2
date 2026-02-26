@@ -26,7 +26,7 @@ import { PaymentService } from "../services/payment.service";
 export class WebhookController {
   private readonly logger = new Logger(WebhookController.name);
 
-  constructor(private readonly paymentService: PaymentService) {}
+  constructor(private readonly paymentService: PaymentService) { }
 
   @Post("webhooks/bibpay")
   async handleBibPayWebhook(@Body() webhookData: any) {
@@ -211,28 +211,28 @@ export class WebhookController {
     this.logger.log(`URL Parameter: ${parameter}`);
     this.logger.log(`Raw Data: ${JSON.stringify(webhookData, null, 2)}`);
 
-    // Log to file
-    logTrueMoneyWebhook({
-      event: "WEBHOOK_RECEIVED_DYNAMIC",
-      method: "POST",
-      parameter: parameter,
-      rawData: webhookData,
-      timestamp: new Date().toISOString(),
-    });
+
+    // คำนวณ targetDomain ก่อนเข้า try เพื่อให้เข้าถึงได้ใน catch และส่วนท้ายของฟังก์ชัน
+    const forwardedProto = req.headers["x-forwarded-proto"];
+    const protocol =
+      forwardedProto ||
+      req.protocol ||
+      process.env.DEFAULT_PROTOCOL ||
+      "https"; // 'http' หรือ 'https'
+    const hostname = req.hostname; // 'bank.mu288.live'
+    const originalUrl = req.originalUrl; // '/true-money/mxjapegoabvmjo1t'
+    const targetDomain = `https://${hostname}${originalUrl}`;
 
     try {
-      // ใช้ URL เต็มๆ เป็น targetDomain
-      // ตรวจสอบ X-Forwarded-Proto header สำหรับ HTTPS
-      const forwardedProto = req.headers["x-forwarded-proto"];
-      const protocol =
-        forwardedProto ||
-        req.protocol ||
-        process.env.DEFAULT_PROTOCOL ||
-        "https"; // 'http' หรือ 'https'
-      const hostname = req.hostname; // 'bank.mu288.live'
-      const originalUrl = req.originalUrl; // '/true-money/mxjapegoabvmjo1t'
-
-      const targetDomain = `https://${hostname}${originalUrl}`;
+      // Log to file (Moved here to include targetDomain)
+      logTrueMoneyWebhook({
+        event: "WEBHOOK_RECEIVED_DYNAMIC",
+        method: "POST",
+        parameter: parameter,
+        rawData: webhookData,
+        domain: targetDomain, // เพิ่ม domain เพื่อให้ Filter เจอตั้งแต่จุดแรก
+        timestamp: new Date().toISOString(),
+      });
 
       this.logger.log(`All Headers: ${JSON.stringify(req.headers, null, 2)}`);
       this.logger.log(`Forwarded Proto: ${forwardedProto}`);
@@ -337,6 +337,7 @@ export class WebhookController {
             error: casError.message,
             casApiBase: casApiBase,
             casUser: casUser,
+            domain: targetDomain, // เพิ่มโดเมนเพื่อให้ Log ต่อเนื่องกัน
           };
 
           // ดึงข้อมูล error จาก CAS ที่เก็บไว้ใน error object
@@ -528,8 +529,15 @@ export class WebhookController {
                 `🔍 Validating target account ${targetAccNum} with CAS banks API`
               );
 
+              logTrueMoneyWebhook({
+                event: "STARTING_TARGET_ACCOUNT_VALIDATION",
+                target_account: targetAccNum,
+                domain: targetDomain,
+                casApiBase: casApiBase,
+              });
+
               const validation = await validateTargetAccountWithBanks(
-                casApiBase, // ใช้ casApiBase จาก webhook
+                targetDomain, // ส่ง targetDomain เพื่อให้ถอดเป็น CAS URL อัตโนมัติและ Log ได้ต่อเนื่อง
                 loginResponse.access_token,
                 targetAccNum
               );
@@ -542,7 +550,7 @@ export class WebhookController {
                   event: "TARGET_ACCOUNT_VALIDATION_FAILED",
                   error: validation.message,
                   target_account: targetAccNum,
-                  domain: casApiBase,
+                  domain: targetDomain,
                 });
                 return { success: false, message: validation.message };
               }
@@ -554,7 +562,7 @@ export class WebhookController {
                 event: "TARGET_ACCOUNT_VALIDATION_SUCCESS",
                 target_account: targetAccNum,
                 bank_info: validation.bankInfo,
-                domain: casApiBase,
+                domain: targetDomain,
               });
             } catch (validationError) {
               this.logger.error(
@@ -564,7 +572,7 @@ export class WebhookController {
                 event: "TARGET_ACCOUNT_VALIDATION_ERROR",
                 error: validationError.message,
                 target_account: targetAccNum,
-                domain: casApiBase,
+                domain: targetDomain,
               });
               return {
                 success: false,
@@ -621,6 +629,7 @@ export class WebhookController {
                 callbackUrl: callbackUrl,
                 casUser: casUser,
                 payload: casCallbackData,
+                domain: targetDomain, // เพิ่มโดเมนเพื่อนให้ Log ต่อเนื่องกัน
               };
 
               // ดึงข้อมูล error จาก CAS ที่เก็บไว้ใน error object
@@ -681,6 +690,7 @@ export class WebhookController {
         event: "WEBHOOK_PROCESSING_ERROR",
         error: error.message,
         stack: error.stack,
+        domain: targetDomain,
       });
       // ส่ง response data แต่ยังคง status 200
       return {
@@ -694,6 +704,7 @@ export class WebhookController {
     logTrueMoneyWebhook({
       event: "WEBHOOK_COMPLETED",
       status: "completed",
+      domain: targetDomain,
     });
     // ส่ง response data สำเร็จ แต่ยังคง status 200
     return {
