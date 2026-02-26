@@ -435,7 +435,7 @@ export async function handleCasCallback(
   callbackUrl: string,
   callbackData: any,
   retryCount: number = 0
-): Promise<void> {
+): Promise<any> {
   const maxRetries = 1; // Retry 1 ครั้งเท่านั้น
   const cacheManager = TokenCacheManager.getInstance();
 
@@ -467,6 +467,7 @@ export async function handleCasCallback(
       });
 
       console.log(`✅ CAS callback completed successfully`);
+      return response.data; // ส่ง response data กลับเพื่อ log ใน caller
     } catch (callbackError) {
       // ตรวจสอบว่าเป็น auth error หรือไม่
       if (

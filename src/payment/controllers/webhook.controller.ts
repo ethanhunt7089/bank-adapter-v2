@@ -222,6 +222,7 @@ export class WebhookController {
     const hostname = req.hostname; // 'bank.mu288.live'
     const originalUrl = req.originalUrl; // '/true-money/mxjapegoabvmjo1t'
     const targetDomain = `https://${hostname}${originalUrl}`;
+    let casResult: any = null; // สำหรับเก็บค่าที่จะส่งกลับใน HTTP Response
 
     try {
       // Log to file (Moved here to include targetDomain)
@@ -596,7 +597,7 @@ export class WebhookController {
                 callbackData: casCallbackData,
               });
 
-              await handleCasCallback(
+              const casResponse = await handleCasCallback(
                 {
                   casUser: casUser,
                   casPassword: casPassword,
@@ -613,7 +614,10 @@ export class WebhookController {
                 domain: targetDomain,
                 transaction_id: decoded.transaction_id,
                 amount_baht: amountInBaht,
+                cas_response: casResponse, // เพิ่ม response จาก CAS
               });
+
+              casResult = casResponse; // เก็บผลลัพธ์เพื่อส่งกลับใน HTTP Response
             } catch (casError) {
               this.logger.error(
                 `❌ Failed to send callback to CAS: ${casError.message}`
@@ -676,6 +680,7 @@ export class WebhookController {
               }
 
               logTrueMoneyWebhook(errorDetails);
+              casResult = { error: casError.message, details: errorDetails }; // เก็บข้อมูล Error
 
               // ไม่ return error เพราะ webhook ยังประมวลผลสำเร็จ
             }
@@ -710,6 +715,7 @@ export class WebhookController {
     return {
       success: true,
       message: "Webhook processed successfully",
+      casResult: casResult, // เพิ่มผลลัพธ์จาก CAS กลับไปให้ผู้เรียก
       timestamp: new Date().toISOString(),
     };
   }
