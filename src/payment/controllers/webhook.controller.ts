@@ -538,7 +538,7 @@ export class WebhookController {
               });
 
               const validation = await validateTargetAccountWithBanks(
-                targetDomain, // ส่ง targetDomain เพื่อให้ถอดเป็น CAS URL อัตโนมัติและ Log ได้ต่อเนื่อง
+                casApiBase, // ส่ง casApiBase โดยตรงแทน targetDomain
                 loginResponse.access_token,
                 targetAccNum
               );

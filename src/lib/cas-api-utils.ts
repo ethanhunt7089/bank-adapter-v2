@@ -566,12 +566,11 @@ export async function handleCasCallback(
  * @returns true ถ้าพบบัญชี, false ถ้าไม่พบ
  */
 export async function validateTargetAccountWithBanks(
-  targetDomain: string,
+  casApiUrl: string, // รับ CAS API URL โดยตรง
   accessToken: string,
   targetAccNum: string
 ): Promise<{ isValid: boolean; bankInfo?: any; message?: string }> {
   try {
-    const casApiUrl = getCasApiUrl(targetDomain);
     const banksUrl = `${casApiUrl}/banks`;
 
     console.log(
