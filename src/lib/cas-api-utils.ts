@@ -609,16 +609,32 @@ export async function validateTargetAccountWithBanks(
 
     console.log(`📊 Received ${banks.length} banks from CAS`);
 
-    // ค้นหาบัญชีที่ตรงกับ targetAccNum (เช็คแค่เบอร์โทรศัพท์)
+    // --- LOG ข้อมูลบัญชีทั้งหมดเพื่อตรวจสอบ ---
+    const bankSummary = banks.map((b: any, index: number) => ({
+      index: index + 1,
+      acc_no: b.account_no,
+      phone: b.phone_number,
+      is_dep: b.is_enable_deposit,
+      is_show: b.is_show,
+      bank_code: b.bank_code
+    }));
+    console.log(`🔍 Target Account to match: "${targetAccNum}"`);
+    console.log(`🏦 CAS Bank List Detail:`, JSON.stringify(bankSummary, null, 2));
+    // ---------------------------------------
+
+    // ลบอักขระที่ไม่ใช่ตัวเลขออกก่อนเทียบ (เช่น ขีด, ช่องว่าง)
+    const cleanTarget = targetAccNum.replace(/\D/g, '');
+
     const foundBank = banks.find((bank: any) => {
-      return (
-        bank.phone_number === targetAccNum &&
-        bank.is_enable_deposit === true
-      );
+      const cleanPhone = (bank.phone_number || '').replace(/\D/g, '');
+      const cleanAcc = (bank.account_no || '').replace(/\D/g, '');
+
+      return (cleanPhone === cleanTarget || cleanAcc === cleanTarget) &&
+        bank.is_enable_deposit === true;
     });
 
     if (foundBank) {
-      console.log(`✅ Found target account ${targetAccNum} in CAS banks`);
+      console.log(`✅ Found target account ${targetAccNum} in CAS banks (Matched: ${foundBank.id})`);
       return {
         isValid: true,
         bankInfo: foundBank,
