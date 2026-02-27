@@ -612,7 +612,7 @@ export async function validateTargetAccountWithBanks(
     // --- LOG ข้อมูลบัญชีทั้งหมดเพื่อตรวจสอบ ---
     const bankSummary = banks.map((b: any, index: number) => ({
       index: index + 1,
-      acc_no: b.account_no,
+      acc_no: b.account_number || b.account_no, // รองรับทั้ง account_number และ account_no
       phone: b.phone_number,
       is_dep: b.is_enable_deposit,
       is_show: b.is_show,
@@ -627,7 +627,7 @@ export async function validateTargetAccountWithBanks(
 
     const foundBank = banks.find((bank: any) => {
       const cleanPhone = (bank.phone_number || '').replace(/\D/g, '');
-      const cleanAcc = (bank.account_no || '').replace(/\D/g, '');
+      const cleanAcc = (bank.account_number || bank.account_no || '').replace(/\D/g, '');
 
       return (cleanPhone === cleanTarget || cleanAcc === cleanTarget) &&
         bank.is_enable_deposit === true;
