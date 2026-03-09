@@ -434,7 +434,8 @@ export async function handleCasCallback(
   config: CasApiConfig,
   callbackUrl: string,
   callbackData: any,
-  retryCount: number = 0
+  retryCount: number = 0,
+  metadata?: { requestId?: string; domain?: string }
 ): Promise<any> {
   const maxRetries = 1; // Retry 1 ครั้งเท่านั้น
   const cacheManager = TokenCacheManager.getInstance();
@@ -464,6 +465,7 @@ export async function handleCasCallback(
         responseData: response.data,
         responseHeaders: response.headers,
         callbackUrl: callbackUrl,
+        ...metadata,
       });
 
       console.log(`✅ CAS callback completed successfully`);
@@ -490,7 +492,8 @@ export async function handleCasCallback(
           config,
           callbackUrl,
           callbackData,
-          retryCount + 1
+          retryCount + 1,
+          metadata
         );
       }
 
@@ -514,6 +517,7 @@ export async function handleCasCallback(
           casUser: config.casUser,
           casApiBase: config.casApiBase,
           targetDomain: config.targetDomain,
+          ...metadata,
         });
       } else if (error.request) {
         logTrueMoneyWebhook({
@@ -530,6 +534,7 @@ export async function handleCasCallback(
             method: "POST",
             url: callbackUrl,
           },
+          ...metadata,
         });
       } else {
         logTrueMoneyWebhook({
@@ -540,6 +545,7 @@ export async function handleCasCallback(
           casUser: config.casUser,
           casApiBase: config.casApiBase,
           targetDomain: config.targetDomain,
+          ...metadata,
         });
       }
     } else {
@@ -568,7 +574,8 @@ export async function handleCasCallback(
 export async function validateTargetAccountWithBanks(
   casApiUrl: string, // รับ CAS API URL โดยตรง
   accessToken: string,
-  targetAccNum: string
+  targetAccNum: string,
+  metadata?: { requestId?: string; domain?: string }
 ): Promise<{ isValid: boolean; bankInfo?: any; message?: string }> {
   try {
     const banksUrl = `${casApiUrl}/banks`;
@@ -657,18 +664,52 @@ export async function validateTargetAccountWithBanks(
           `Server error: ${error.response.status} - ${error.response.statusText}`
         );
         console.error(`Response data:`, error.response.data);
+
+        // --- เพิ่มการ Log ลงไฟล์ ---
+        logTrueMoneyWebhook({
+          event: "TARGET_ACCOUNT_VALIDATION_ERROR_RESPONSE",
+          error: error.message,
+          status: error.response.status,
+          statusText: error.response.statusText,
+          responseData: error.response.data,
+          target_account: targetAccNum,
+          casApiUrl: casApiUrl,
+          ...metadata,
+        });
+
         return {
           isValid: false,
           message: `Banks API error: ${error.response.status} - ${error.response.statusText}`,
         };
       } else if (error.request) {
         console.error(`No response received from banks API`);
+
+        // --- เพิ่มการ Log ลงไฟล์ (กรณี Timeout หรือ Unreachable) ---
+        logTrueMoneyWebhook({
+          event: "TARGET_ACCOUNT_VALIDATION_UNREACHABLE",
+          error: error.message,
+          errorCode: error.code,
+          isTimeout: error.code === "ECONNABORTED",
+          target_account: targetAccNum,
+          casApiUrl: casApiUrl,
+          ...metadata,
+        });
+
         return {
           isValid: false,
           message: "Banks API unreachable",
         };
       }
     }
+
+    // --- เพิ่มการ Log ลงไฟล์สำหรับ Error อื่นๆ ---
+    logTrueMoneyWebhook({
+      event: "TARGET_ACCOUNT_VALIDATION_ERROR",
+      error: error.message,
+      target_account: targetAccNum,
+      casApiUrl: casApiUrl,
+      ...metadata,
+    });
 
     return {
       isValid: false,

@@ -222,6 +222,11 @@ export class WebhookController {
     const hostname = req.hostname; // 'bank.mu288.live'
     const originalUrl = req.originalUrl; // '/true-money/mxjapegoabvmjo1t'
     const targetDomain = `https://${hostname}${originalUrl}`;
+
+    // Generate Unique Request ID for tracing (Tag)
+    const requestId = `TRU-${Date.now()}-${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
+    const logMetadata = { requestId, domain: targetDomain };
+
     let casResult: any = null; // สำหรับเก็บค่าที่จะส่งกลับใน HTTP Response
 
     try {
@@ -231,7 +236,7 @@ export class WebhookController {
         method: "POST",
         parameter: parameter,
         rawData: webhookData,
-        domain: targetDomain, // เพิ่ม domain เพื่อให้ Filter เจอตั้งแต่จุดแรก
+        ...logMetadata,
         timestamp: new Date().toISOString(),
       });
 
@@ -274,7 +279,7 @@ export class WebhookController {
         logTrueMoneyWebhook({
           event: "DB_QUERY_FAILED",
           error: "BoWebhook not found or BoToken inactive",
-          domain: targetDomain,
+          ...logMetadata,
         });
         // ส่ง response data แต่ยังคง status 200
         return {
@@ -298,10 +303,10 @@ export class WebhookController {
 
         logTrueMoneyWebhook({
           event: "DB_QUERY_SUCCESS",
-          domain: targetDomain,
           casUser: casUser,
           casApiBase: casApiBase,
           hasSecret: !!trueSecret,
+          ...logMetadata,
         });
 
         // Login CAS
@@ -326,8 +331,8 @@ export class WebhookController {
 
           logTrueMoneyWebhook({
             event: "CAS_LOGIN_SUCCESS",
-            domain: targetDomain,
             casUser: casUser,
+            ...logMetadata,
           });
         } catch (casError) {
           this.logger.error(`❌ CAS login failed: ${casError.message}`);
@@ -338,7 +343,7 @@ export class WebhookController {
             error: casError.message,
             casApiBase: casApiBase,
             casUser: casUser,
-            domain: targetDomain, // เพิ่มโดเมนเพื่อให้ Log ต่อเนื่องกัน
+            ...logMetadata,
           };
 
           // ดึงข้อมูล error จาก CAS ที่เก็บไว้ใน error object
@@ -405,7 +410,7 @@ export class WebhookController {
         logTrueMoneyWebhook({
           event: "TOKEN_EXTRACTED",
           token: token || "null",
-          domain: targetDomain,
+          ...logMetadata,
         });
 
         if (!token || typeof token !== "string") {
@@ -413,7 +418,7 @@ export class WebhookController {
           logTrueMoneyWebhook({
             event: "TOKEN_VALIDATION_FAILED",
             error: "No valid token found",
-            domain: targetDomain,
+            ...logMetadata,
           });
           // ส่ง response data แต่ยังคง status 200
           return {
@@ -426,7 +431,7 @@ export class WebhookController {
           logTrueMoneyWebhook({
             event: "SECRET_NOT_FOUND",
             error: "TrueSecret not configured in database",
-            domain: targetDomain,
+            ...logMetadata,
           });
           // ส่ง response data แต่ยังคง status 200
           return {
@@ -448,8 +453,8 @@ export class WebhookController {
             logTrueMoneyWebhook({
               event: "JWT_VERIFICATION_FAILED",
               error: "Invalid JWT signature or format",
-              domain: targetDomain,
               token: token.substring(0, 50) + "...",
+              ...logMetadata,
             });
             // ส่ง response data แต่ยังคง status 200
             return {
@@ -480,7 +485,6 @@ export class WebhookController {
 
             logTrueMoneyWebhook({
               event: "JWT_DECODED_SUCCESS",
-              domain: targetDomain,
               decoded: {
                 event_type: decoded.event_type,
                 transaction_id: decoded.transaction_id,
@@ -490,6 +494,7 @@ export class WebhookController {
                 sender_mobile: decoded.sender_mobile,
                 received_time: decoded.received_time,
               },
+              ...logMetadata,
             });
 
             const casCallbackData = {
@@ -516,7 +521,7 @@ export class WebhookController {
               logTrueMoneyWebhook({
                 event: "TARGET_ACCOUNT_NOT_CONFIGURED",
                 error: "Target account number not configured",
-                domain: targetDomain,
+                ...logMetadata,
               });
               return {
                 success: false,
@@ -533,14 +538,15 @@ export class WebhookController {
               logTrueMoneyWebhook({
                 event: "STARTING_TARGET_ACCOUNT_VALIDATION",
                 target_account: targetAccNum,
-                domain: targetDomain,
                 casApiBase: casApiBase,
+                ...logMetadata,
               });
 
               const validation = await validateTargetAccountWithBanks(
                 casApiBase, // ส่ง casApiBase โดยตรงแทน targetDomain
                 loginResponse.access_token,
-                targetAccNum
+                targetAccNum,
+                logMetadata
               );
 
               if (!validation.isValid) {
@@ -551,7 +557,7 @@ export class WebhookController {
                   event: "TARGET_ACCOUNT_VALIDATION_FAILED",
                   error: validation.message,
                   target_account: targetAccNum,
-                  domain: targetDomain,
+                  ...logMetadata,
                 });
                 return { success: false, message: validation.message };
               }
@@ -563,7 +569,7 @@ export class WebhookController {
                 event: "TARGET_ACCOUNT_VALIDATION_SUCCESS",
                 target_account: targetAccNum,
                 bank_info: validation.bankInfo,
-                domain: targetDomain,
+                ...logMetadata,
               });
             } catch (validationError) {
               this.logger.error(
@@ -573,7 +579,7 @@ export class WebhookController {
                 event: "TARGET_ACCOUNT_VALIDATION_ERROR",
                 error: validationError.message,
                 target_account: targetAccNum,
-                domain: targetDomain,
+                ...logMetadata,
               });
               return {
                 success: false,
@@ -591,10 +597,10 @@ export class WebhookController {
 
               logTrueMoneyWebhook({
                 event: "SENDING_CAS_CALLBACK",
-                domain: targetDomain,
                 casApiBase: casApiBase,
                 callbackUrl: callbackUrl,
                 callbackData: casCallbackData,
+                ...logMetadata,
               });
 
               const casResponse = await handleCasCallback(
@@ -604,17 +610,19 @@ export class WebhookController {
                   casApiBase: casApiUrl, // ส่ง casApiBase ไปแทน targetDomain
                 },
                 callbackUrl,
-                casCallbackData
+                casCallbackData,
+                0,
+                logMetadata
               );
 
               this.logger.log("✅ Callback sent to CAS successfully");
 
               logTrueMoneyWebhook({
                 event: "CAS_CALLBACK_SUCCESS",
-                domain: targetDomain,
                 transaction_id: decoded.transaction_id,
                 amount_baht: amountInBaht,
                 cas_response: casResponse, // เพิ่ม response จาก CAS
+                ...logMetadata,
               });
 
               casResult = casResponse; // เก็บผลลัพธ์เพื่อส่งกลับใน HTTP Response
@@ -633,7 +641,7 @@ export class WebhookController {
                 callbackUrl: callbackUrl,
                 casUser: casUser,
                 payload: casCallbackData,
-                domain: targetDomain, // เพิ่มโดเมนเพื่อนให้ Log ต่อเนื่องกัน
+                ...logMetadata,
               };
 
               // ดึงข้อมูล error จาก CAS ที่เก็บไว้ใน error object
@@ -695,7 +703,7 @@ export class WebhookController {
         event: "WEBHOOK_PROCESSING_ERROR",
         error: error.message,
         stack: error.stack,
-        domain: targetDomain,
+        ...logMetadata,
       });
       // ส่ง response data แต่ยังคง status 200
       return {
@@ -709,7 +717,7 @@ export class WebhookController {
     logTrueMoneyWebhook({
       event: "WEBHOOK_COMPLETED",
       status: "completed",
-      domain: targetDomain,
+      ...logMetadata,
     });
     // ส่ง response data สำเร็จ แต่ยังคง status 200
     return {
