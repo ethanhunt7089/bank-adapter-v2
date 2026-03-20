@@ -152,10 +152,12 @@ export function getCasApiUrl(targetDomain: string): string {
 }
 
 /**
- * Login ไปที่ CAS API และรับ access_token (with caching)
- * @param config - ข้อมูลสำหรับ login
- * @param forceRefresh - บังคับให้ login ใหม่ (ไม่ใช้ cache)
- * @returns access_token และ profile
+ * ล็อกอินเข้าสู่ระบบ CAS API เพื่อขอรับ access_token
+ * มีระบบ Caching เพื่อลดจำนวนการล็อกอินซ้ำซ้อนภายในเวลาที่กำหนด
+ * 
+ * @param config การตั้งค่าสำหรับการล็อกอิน (User, Password, API Base)
+ * @param forceRefresh บังคับให้ล็อกอินใหม่โดยไม่ใช้ Cache
+ * @returns ออบเจกต์ผลลัพธ์ที่มี access_token และข้อมูลโปรไฟล์
  */
 export async function loginToCas(
   config: CasApiConfig,
@@ -165,7 +167,7 @@ export async function loginToCas(
   const casApiUrl = config.casApiBase || getCasApiUrl(config.targetDomain);
   const cacheManager = TokenCacheManager.getInstance();
 
-  // ตรวจสอบ cache (ถ้าไม่บังคับ refresh)
+  // 1. ตรวจสอบใน Token Cache ก่อนเพื่อลดการยิงไปที่ CAS API โดยไม่จำเป็น
   if (!forceRefresh) {
     const cached = cacheManager.get(casApiUrl, config.casUser);
     if (cached) {
@@ -424,11 +426,15 @@ async function sendCallbackToCasWithResponse(
 }
 
 /**
- * Helper function สำหรับใช้งาน CAS API แบบครบวงจร (with retry on auth error)
- * @param config - ข้อมูลสำหรับ login
- * @param callbackUrl - URL ที่จะส่ง callback ไป
- * @param callbackData - ข้อมูลที่จะส่ง
- * @param retryCount - จำนวนครั้งที่ retry แล้ว (default: 0)
+ * ฟังก์ชันหลักในการส่งคำขอไปยังระบบแจ้งเตือนของ CAS (handleCasCallback)
+ * รองรับการล็อกอินอัตโนมัติหาก Token หมดอายุ (Retry 1 ครั้ง)
+ * 
+ * @param config การตั้งค่า CAS API
+ * @param callbackUrl URL ปลายทางที่ต้องการส่งข้อมูลไป
+ * @param callbackData ข้อมูลรายการที่จะส่ง (payload)
+ * @param retryCount จำนวนครั้งที่ได้ลองส่งไปแล้ว
+ * @param metadata ข้อมูลเพิ่มเติมสำหรับ Log (requestId, domain)
+ * @returns ข้อมูลที่ได้รับตอบกลับจาก CAS
  */
 export async function handleCasCallback(
   config: CasApiConfig,
@@ -565,11 +571,14 @@ export async function handleCasCallback(
 }
 
 /**
- * ตรวจสอบ target account number กับ CAS API /banks
- * @param targetDomain - Domain ของ CAS API
- * @param accessToken - access_token จาก CAS login
- * @param targetAccNum - หมายเลขบัญชีที่ต้องการตรวจสอบ
- * @returns true ถ้าพบบัญชี, false ถ้าไม่พบ
+ * ตรวจสอบความถูกต้องของบัญชีธนาคารปลายทางด้วย CAS /banks API
+ * เพื่อยืนยันว่าบัญชีที่ระบุในรายการฝากมีตัวตนอยู่จริงในระบบ CAS และเปิดรับฝากอยู่
+ * 
+ * @param casApiUrl URL พื้นฐานของ CAS API
+ * @param accessToken โทเค็นสำหรับยืนยันตัวตน
+ * @param targetAccNum หมายเลขบัญชีที่ต้องการตรวจสอบ
+ * @param metadata ข้อมูลเพิ่มเติมสำหรับ Log
+ * @returns ออบเจกต์บอกสถานะความถูกต้องของบัญชี
  */
 export async function validateTargetAccountWithBanks(
   casApiUrl: string, // รับ CAS API URL โดยตรง
@@ -631,6 +640,8 @@ export async function validateTargetAccountWithBanks(
     // ลบอักขระที่ไม่ใช่ตัวเลขออกก่อนเทียบ (เช่น ขีด, ช่องว่าง)
     const cleanTarget = targetAccNum.replace(/\D/g, '');
 
+    // 2. ทำการค้นหาบัญชีที่ต้องการ (Matched) โดยตรวจสอบทั้งเบอร์โทรศัพท์และเลขบัญชี
+    // และต้องเป็นบัญชีที่เปิดรับฝากเงินได้ (is_enable_deposit === true)
     const foundBank = banks.find((bank: any) => {
       const cleanPhone = (bank.phone_number || '').replace(/\D/g, '');
       const cleanAcc = (bank.account_number || bank.account_no || '').replace(/\D/g, '');

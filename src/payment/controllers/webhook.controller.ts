@@ -21,6 +21,11 @@ import { verifyTrueMoneyToken } from "../../lib/true-money-utils";
 import { logTrueMoneyWebhook } from "../../lib/winston-logger.config";
 import { PaymentService } from "../services/payment.service";
 
+/**
+ * คลาสสำหรับจัดการ Webhook จากผู้ให้บริการชำระเงินต่างๆ
+ * รองรับการรับข้อมูลจาก BibPay, PayOneX และ TrueMoney
+ * ทำหน้าที่เป็นทางผ่านข้อมูลเพื่อตรวจสอบและส่งต่อไปยังระบบ CAS
+ */
 @ApiExcludeController()
 @Controller()
 export class WebhookController {
@@ -197,7 +202,22 @@ export class WebhookController {
     };
   }
 
-  // TrueMoney Webhook - POST Method (Dynamic URL)
+  /**
+   * จัดการ Webhook แบบ POST จาก TrueMoney (Dynamic URL)
+   * 
+   * @param parameter พารามิเตอร์ที่ส่งมาใน URL (เช่น ชื่อโดเมน)
+   * @param webhookData ข้อมูลดิบที่ได้รับจาก TrueMoney (JWT token)
+   * @param req ออบเจกต์ Request ของ NestJS สำหรับดึงข้อมูล Header และ Hostname
+   * @returns ผลลัพธ์การประมวลผล กลับไปให้ผู้เรียก (Status 200 เสมอ)
+   * 
+   * ขั้นตอนการทำงาน:
+   * 1. สร้าง requestId เพื่อใช้ในการติดตาม Log
+   * 2. ค้นหา Config ของโดเมนจากฐานข้อมูล (BoWebhook)
+   * 3. ทำการ Login เข้าสู่ระบบ CAS
+   * 4. ตรวจสอบความถูกต้องของ JWT Token ด้วย Secret จาก DB
+   * 5. ตรวจสอบบัญชีธนาคารปลายทางกับ CAS /banks API
+   * 6. ส่ง Notification ไปยัง CAS และ Forward Webhook ให้ลูกค้า
+   */
   @Post("true-money/:parameter")
   @HttpCode(200)
   async handleTrueMoneyWebhookPostDynamic(
@@ -212,7 +232,8 @@ export class WebhookController {
     this.logger.log(`Raw Data: ${JSON.stringify(webhookData, null, 2)}`);
 
 
-    // คำนวณ targetDomain ก่อนเข้า try เพื่อให้เข้าถึงได้ใน catch และส่วนท้ายของฟังก์ชัน
+    // 1. ระบุ Target Domain เพื่อใช้ค้นหาการตั้งค่าของลูกค้ารายนั้นๆ
+    // โดยดึงข้อมูลจาก Hostname และ Original URL ของ Request ที่ส่งเข้ามา
     const forwardedProto = req.headers["x-forwarded-proto"];
     const protocol =
       forwardedProto ||
@@ -223,14 +244,14 @@ export class WebhookController {
     const originalUrl = req.originalUrl; // '/true-money/mxjapegoabvmjo1t'
     const targetDomain = `https://${hostname}${originalUrl}`;
 
-    // Generate Unique Request ID for tracing (Tag)
+    // 2. สร้าง Request ID (Tag) สำหรับติดตาม Log ของรายการนี้ตั้งแต่ต้นจนจบ
     const requestId = `TRU-${Date.now()}-${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
     const logMetadata = { requestId, domain: targetDomain };
 
     let casResult: any = null; // สำหรับเก็บค่าที่จะส่งกลับใน HTTP Response
 
     try {
-      // Log to file (Moved here to include targetDomain)
+      // 3. บันทึก Log เริ่มต้นของการรับ Webhook พร้อมข้อมูลดิบ (Raw Data)
       logTrueMoneyWebhook({
         event: "WEBHOOK_RECEIVED_DYNAMIC",
         method: "POST",
@@ -472,13 +493,13 @@ export class WebhookController {
             );
             this.logger.log(`Received Time: ${decoded.received_time}`);
 
-            // สร้างข้อมูล callback สำหรับ CAS ตามรูปแบบที่ถูกต้อง
+            // 11. แปลงหน่วยเงินจากสตางค์เป็นบาท และเตรียมข้อมูลสำหรับส่งเข้า CAS
             const senderMobile = decoded.sender_mobile || "-";
             const senderName = decoded.sender_name || "Unknown";
             const senderNameSearch = (decoded.sender_name || "Unknown").replace(
               /\*/g,
               ""
-            ); // ลบ * สำหรับ search
+            ); // ลบเครื่องหมายดอกจัน (*) สำหรับการค้นหาในระบบ CAS
 
             // แปลงจากสตางค์เป็นบาท (หาร 100) และเก็บทศนิยม 2 ตำแหน่ง
             const amountInBaht = parseFloat((decoded.amount / 100).toFixed(2));
@@ -728,7 +749,14 @@ export class WebhookController {
     };
   }
 
-  // TrueMoney Webhook - GET Method (Dynamic URL)
+  /**
+   * จัดการ Webhook แบบ GET จาก TrueMoney (Dynamic URL)
+   * ใช้สำหรับการตรวจสอบความถูกต้องเบื้องต้นผ่าน Query Parameters
+   * 
+   * @param parameter พารามิเตอร์ที่ส่งมาใน URL
+   * @param queryParams ข้อมูลที่ส่งมาทางสาร Query String (message หรือ token)
+   * @param req ออบเจกต์ Request
+   */
   @Get("true-money/:parameter/webhook")
   @HttpCode(200)
   async handleTrueMoneyWebhookGetDynamic(

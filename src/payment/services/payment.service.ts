@@ -18,6 +18,14 @@ export class PaymentService {
 
   constructor(private readonly paymentGatewayFactory: PaymentGatewayFactory) {}
 
+  /**
+   * สร้างรายการฝากเงินใหม่ในระบบ
+   * ตรวจสอบความถูกต้องของ Token, สถานะการใช้งาน และรันยุทธวิธี (Strategy) ตามเกตเวย์
+   * 
+   * @param payload ข้อมูลที่จำเป็นในการสร้างรายการฝาก (refCode, amount, bankInfo)
+   * @param tokenUuid โทเค็นประจำตัวลูกค้าเพื่อระบุการตั้งค่า
+   * @returns ผลลัพธ์การสร้างรายการพร้อม URL สำหรับชำระเงิน (ถ้ามี)
+   */
   async createDeposit(
     payload: CreateDepositPayload,
     tokenUuid: string
@@ -151,6 +159,14 @@ export class PaymentService {
     }
   }
 
+  /**
+   * สร้างรายการถอนเงินใหม่ในระบบ
+   * ทำการตรวจสอบสิทธิ์และส่งคำขอไปยังเกตเวย์ที่กำหนด
+   * 
+   * @param payload ข้อมูลที่จำเป็นสำหรับการถอนเงิน (บัญชีปลายทาง, จำนวนเงิน)
+   * @param tokenUuid โทเค็นประจำตัวลูกค้า
+   * @returns ข้อมูลสถานะการทำรายการถอน
+   */
   async createWithdraw(
     payload: CreateWithdrawPayload,
     tokenUuid: string
@@ -337,6 +353,12 @@ export class PaymentService {
     }
   }
 
+  /**
+   * ฟังก์ชันจัดการ Webhook กลาง (Generic Webhook Handler)
+   * รับข้อมูลจาก Controller เพื่อนำมาบันทึกสถานะ และส่งต่อ (Forward) ไปยังระบบของลูกค้า
+   * 
+   * @param webhookData ข้อมูล Webhook ที่ได้รับการจัดรูปแบบแล้ว
+   */
   async handleWebhook(webhookData: WebhookData): Promise<void> {
     try {
       this.logger.log(
